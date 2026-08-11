@@ -34,6 +34,17 @@
       font-size: 27px;
     }
 
+    .system-status {
+      margin-top: 7px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .status-loading { color: #9a6700; }
+    .status-ready { color: #137333; }
+    .status-retrying { color: #9a6700; }
+    .status-error { color: #c5221f; }
+
     .session {
       margin-top: 6px;
       color: #6b7280;
@@ -307,6 +318,9 @@
   <div class="header">
     <h1>Điểm danh ca viên</h1>
     <div class="session" id="session">Đang tải thông tin buổi...</div>
+    <div id="systemStatus" class="system-status status-loading">
+      🟡 Đang kết nối hệ thống...
+    </div>
   </div>
 
   <div class="stats">
@@ -485,26 +499,76 @@ function apiUrl(params) {
   return API_URL + '?' + query;
 }
 
-function callApi(params) {
-  return new Promise(function(resolve, reject) {
+async function callApi(params, options) {
 
-    if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
-      reject(new Error('Chưa cấu hình API_URL của Apps Script.'));
-      return;
+  options = options || {};
+
+  const retries = Number.isFinite(options.retries) ? options.retries : 2;
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 8000;
+
+  if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
+    throw new Error('Chưa cấu hình API_URL của Apps Script.');
+  }
+
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        setSystemStatus(
+          'retrying',
+          '🟡 Đang kết nối lại... (' +
+          (attempt + 1) + '/' + (retries + 1) + ')'
+        );
+        await sleep(500 * attempt);
+      }
+
+      const result = await callApiOnce(params, timeoutMs);
+
+      setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
+      return result;
+
+    } catch (error) {
+      lastError = error;
     }
+  }
+
+  setSystemStatus(
+    'error',
+    '🔴 Kết nối không ổn định — hệ thống sẽ tự thử lại.'
+  );
+
+  throw lastError || new Error('Không kết nối được máy chủ.');
+}
+
+function callApiOnce(params, timeoutMs) {
+
+  return new Promise(function(resolve, reject) {
 
     const callbackName =
       '__checkinCallback_' + Date.now() + '_' +
-      Math.floor(Math.random() * 100000);
-
-    params.callback = callbackName;
+      Math.floor(Math.random() * 1000000);
 
     const script = document.createElement('script');
-    const query = new URLSearchParams(params).toString();
 
+    const request = Object.assign({}, params, {
+      callback: callbackName,
+      _ts: Date.now() + '_' +
+        Math.random().toString(36).slice(2)
+    });
+
+    const query = new URLSearchParams(request).toString();
     let finished = false;
 
+    const timer = setTimeout(function() {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(new Error('Máy chủ phản hồi quá lâu.'));
+    }, timeoutMs);
+
     function cleanup() {
+      clearTimeout(timer);
       try { delete window[callbackName]; } catch (e) {}
       if (script.parentNode) script.parentNode.removeChild(script);
     }
@@ -525,14 +589,20 @@ function callApi(params) {
 
     script.src = API_URL + '?' + query;
     document.body.appendChild(script);
-
-    setTimeout(function() {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      reject(new Error('Máy chủ phản hồi quá lâu.'));
-    }, 15000);
   });
+}
+
+function sleep(ms) {
+  return new Promise(function(resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+function setSystemStatus(type, text) {
+  const box = document.getElementById('systemStatus');
+  if (!box) return;
+  box.className = 'system-status status-' + type;
+  box.textContent = text;
 }
 
 
@@ -540,15 +610,21 @@ function callApi(params) {
    QR SCANNER
    ============================================================ */
 
-async function startScanner() {
+async function startScanner(retryCount) {
+
   unlockAudio();
 
   if (scanning) return;
 
+  retryCount = Number.isFinite(retryCount) ? retryCount : 0;
+
   try {
-    if (!scanner) {
-      scanner = new Html5Qrcode('reader');
+
+    if (scanner) {
+      try { await scanner.clear(); } catch (e) {}
     }
+
+    scanner = new Html5Qrcode('reader');
 
     await scanner.start(
       { facingMode: 'environment' },
@@ -561,13 +637,42 @@ async function startScanner() {
     );
 
     scanning = true;
+
     document.getElementById('startBtn').disabled = true;
     document.getElementById('stopBtn').disabled = false;
 
-    showNeutral('📷', 'Đang quét QR', 'Đưa mã QR vào khung.');
+    setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
+
+    showNeutral(
+      '📷',
+      'Đang quét QR',
+      'Đưa mã QR vào khung.'
+    );
+
   } catch (error) {
+
+    scanning = false;
+
+    if (retryCount < 2) {
+
+      showNeutral(
+        '⏳',
+        'Đang khởi động camera...',
+        'Thử lại tự động.'
+      );
+
+      setTimeout(function() {
+        startScanner(retryCount + 1);
+      }, 700);
+
+      return;
+    }
+
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+
     showError(
-      'Không mở được camera. Hãy cấp quyền camera và sử dụng Chrome/Safari.'
+      'Không mở được camera. Hãy kiểm tra quyền camera rồi bấm "Bắt đầu quét" lại.'
     );
   }
 }
@@ -846,30 +951,44 @@ function showNeutral(icon, title, message) {
    ============================================================ */
 
 async function refreshDashboard() {
-  try {
-    const data = await callApi({ api: 'dashboard' });
 
-    if (!data.success) {
+  setSystemStatus('loading', '🟡 Đang tải thông tin buổi...');
+
+  try {
+
+    const data = await callApi(
+      { api: 'dashboard' },
+      { retries: 3, timeoutMs: 7000 }
+    );
+
+    if (!data || !data.success) {
+
       document.getElementById('session').textContent =
-        data.message || 'Không có buổi điểm danh.';
+        (data && data.message) || 'Không có buổi điểm danh.';
+
+      setSystemStatus('error', '🔴 Chưa lấy được thông tin buổi');
+
+      setTimeout(refreshDashboard, 5000);
       return;
     }
 
     document.getElementById('session').textContent =
       data.maBuoi + ' • ' + data.tenBuoi;
 
-    document.getElementById('total').textContent =
-      data.tongSo;
+    document.getElementById('total').textContent = data.tongSo;
+    document.getElementById('present').textContent = data.daCoMat;
+    document.getElementById('absent').textContent = data.chuaCoMat;
 
-    document.getElementById('present').textContent =
-      data.daCoMat;
-
-    document.getElementById('absent').textContent =
-      data.chuaCoMat;
+    setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
 
   } catch (error) {
+
     document.getElementById('session').textContent =
-      'Không tải được thông tin buổi.';
+      'Đang chờ kết nối...';
+
+    setSystemStatus('retrying', '🟡 Đang tự kết nối lại...');
+
+    setTimeout(refreshDashboard, 5000);
   }
 }
 
@@ -880,16 +999,11 @@ async function refreshDashboard() {
 
 function openAdmin() {
   if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
-    alert('Chưa cấu hình API_URL của Apps Script.');
+    alert('Chưa cấu hình URL Apps Script.');
     return;
   }
 
-  // Mở Admin ở TAB MỚI.
-  // Tab GitHub giữ nguyên camera và trạng thái QR, không bị unload.
-  const adminUrl =
-    API_URL + '?page=admin&from=github';
-
-  window.open(adminUrl, '_blank');
+  window.location.href = API_URL + '?page=admin';
 }
 
 
@@ -930,10 +1044,8 @@ function escapeJs(value) {
    ============================================================ */
 
 window.addEventListener('load', function() {
+  setSystemStatus('loading', '🟡 Đang khởi động hệ thống...');
   refreshDashboard();
-
-  // GitHub Pages là trang chính nên camera có thể chạy trực tiếp.
-  // Trình duyệt sẽ hỏi quyền camera ở lần đầu.
   startScanner();
 });
 </script>
