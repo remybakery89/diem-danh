@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Điểm danh ca viên</title>
+
+  <!-- QR scanner chạy trực tiếp trên GitHub Pages -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f3f5f8;
+      font-family: Arial, sans-serif;
+      color: #202124;
+    }
+
+    .app {
+      max-width: 650px;
+      margin: auto;
+      padding: 16px 14px 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 27px;
+    }
+
+    .session {
+      margin-top: 6px;
+      color: #6b7280;
+      font-size: 15px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: white;
+      border-radius: 15px;
+      padding: 13px 7px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .stat-label {
+      margin-top: 3px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.08);
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    /* QR */
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 15px;
+      background: #111;
+      min-height: 280px;
+    }
+
+    #reader video {
+      width: 100% !important;
+      border-radius: 15px;
+    }
+
+    .scanner-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 11px;
+      padding: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .btn-primary {
+      background: #4285f4;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #e8eaed;
+      color: #333;
+    }
+
+    .btn:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .hint {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin: 10px 0 0;
+    }
+
+    /* Manual check-in */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 15px;
+      color: #888;
+      font-size: 13px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #ddd;
+    }
+
+    .modes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .mode {
+      border: 2px solid #e0e3e7;
+      background: white;
+      border-radius: 12px;
+      padding: 12px 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .mode.active {
+      border-color: #4285f4;
+      background: #eaf2ff;
+      color: #1967d2;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 7px;
+    }
+
+    input {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid #dadce0;
+      border-radius: 13px;
+      font-size: 24px;
+      text-align: center;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #4285f4;
+    }
+
+    button.checkin {
+      width: 100%;
+      margin-top: 11px;
+      padding: 16px;
+      border: 0;
+      border-radius: 13px;
+      background: #4285f4;
+      color: white;
+      font-size: 19px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button.checkin:disabled {
+      opacity: .6;
+    }
+
+    #result {
+      margin-top: 16px;
+    }
+
+    .result-card {
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .success-card {
+      background: #e8f5e9;
+      color: #137333;
+    }
+
+    .duplicate-card {
+      background: #fff8e1;
+      color: #9a6700;
+    }
+
+    .error-card {
+      background: #fce8e6;
+      color: #c5221f;
+    }
+
+    .result-icon { font-size: 36px; }
+    .result-title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 6px;
+    }
+    .result-name {
+      font-size: 27px;
+      font-weight: bold;
+      margin-top: 9px;
+    }
+    .result-info {
+      margin-top: 5px;
+      font-size: 15px;
+    }
+
+    .person {
+      width: 100%;
+      background: white;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      padding: 13px;
+      margin-top: 8px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .person-name {
+      font-weight: bold;
+      font-size: 17px;
+    }
+
+    .person-be {
+      color: #666;
+      margin-top: 3px;
+    }
+
+    .audio-note {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #777;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .nav a {
+      text-decoration: none;
+      color: #1967d2;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    @media (max-width: 420px) {
+      .header h1 { font-size: 24px; }
+      .card { padding: 14px; }
+      .result-name { font-size: 24px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>Điểm danh ca viên</h1>
+    <div class="session" id="session">Đang tải thông tin buổi...</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-number" id="total">-</div>
+      <div class="stat-label">Tổng active</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number" id="present">-</div>
+      <div class="stat-label">Đã có mặt</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number" id="absent">-</div>
+      <div class="stat-label">Chưa có mặt</div>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <div class="section-title">📷 Quét QR điểm danh</div>
+
+    <div id="reader"></div>
+
+    <div class="scanner-controls">
+      <button class="btn btn-primary" id="startBtn" onclick="startScanner()">
+        📷 Bắt đầu quét
+      </button>
+      <button class="btn btn-secondary" id="stopBtn" onclick="stopScanner()" disabled>
+        ■ Dừng camera
+      </button>
+    </div>
+
+    <div class="hint">Đưa mã QR của ca viên vào khung. Quét xong hệ thống tự điểm danh.</div>
+
+    <div class="audio-note">
+      🔊 Nếu trình duyệt chặn âm thanh lần đầu, chạm màn hình một lần để bật tiếng bíp.
+    </div>
+
+    <div class="divider">hoặc nhập thủ công</div>
+
+    <div class="modes">
+      <button class="mode active" id="modePhone" onclick="setMode('phone')">
+        🔢 4 số cuối
+      </button>
+      <button class="mode" id="modeCode" onclick="setMode('code')">
+        👤 Mã cá nhân
+      </button>
+    </div>
+
+    <label id="inputLabel">Nhập 4 số cuối SĐT</label>
+
+    <input
+      id="input"
+      type="text"
+      inputmode="numeric"
+      maxlength="4"
+      placeholder="0001"
+      autocomplete="off"
+      onkeydown="handleEnter(event)"
+    >
+
+    <button class="checkin" id="checkinButton" onclick="submitCheckIn()">
+      ĐIỂM DANH
+    </button>
+
+    <div id="result"></div>
+
+  </div>
+
+  <div class="nav">
+    <a href="#" onclick="openAdmin(); return false;">⚙️ Quản trị</a>
+  </div>
+
+</div>
+
+<script>
+/*
+ * ============================================================
+ * CẤU HÌNH
+ * ============================================================
+ *
+ * Thay URL dưới đây bằng URL Web App Apps Script đang chạy
+ * của hệ thống điểm danh.
+ *
+ * Ví dụ:
+ * https://script.google.com/macros/s/XXXXXXXX/exec
+ */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzV79HNBWB6_8IFujMEbsUjMbkCaivLI3WwzKaI96AWpI3WB0IJrCjbfWJzcLNwbFXhsQ/exec';
+
+let scanner = null;
+let scanning = false;
+let processingQR = false;
+let currentMode = 'phone';
+let audioContext = null;
+
+
+/* ============================================================
+   ÂM THANH
+   ============================================================ */
+
+function unlockAudio() {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+  } catch (e) {}
+}
+
+document.addEventListener('pointerdown', unlockAudio, { once: true });
+
+function beep(type) {
+  try {
+    unlockAudio();
+
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.frequency.value = type === 'success' ? 880 : 440;
+    oscillator.type = 'sine';
+
+    const now = audioContext.currentTime;
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.17);
+  } catch (e) {}
+}
+
+
+/* ============================================================
+   API
+   ============================================================ */
+
+function apiUrl(params) {
+  const query = new URLSearchParams(params).toString();
+  return API_URL + '?' + query;
+}
+
+function callApi(params) {
+  return new Promise(function(resolve, reject) {
+
+    if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
+      reject(new Error('Chưa cấu hình API_URL của Apps Script.'));
+      return;
+    }
+
+    const callbackName =
+      '__checkinCallback_' + Date.now() + '_' +
+      Math.floor(Math.random() * 100000);
+
+    params.callback = callbackName;
+
+    const script = document.createElement('script');
+    const query = new URLSearchParams(params).toString();
+
+    let finished = false;
+
+    function cleanup() {
+      try { delete window[callbackName]; } catch (e) {}
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[callbackName] = function(data) {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = function() {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(new Error('Không kết nối được máy chủ.'));
+    };
+
+    script.src = API_URL + '?' + query;
+    document.body.appendChild(script);
+
+    setTimeout(function() {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(new Error('Máy chủ phản hồi quá lâu.'));
+    }, 15000);
+  });
+}
+
+
+/* ============================================================
+   QR SCANNER
+   ============================================================ */
+
+async function startScanner() {
+  unlockAudio();
+
+  if (scanning) return;
+
+  try {
+    if (!scanner) {
+      scanner = new Html5Qrcode('reader');
+    }
+
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 }
+      },
+      onScanSuccess,
+      function() {}
+    );
+
+    scanning = true;
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+
+    showNeutral('📷', 'Đang quét QR', 'Đưa mã QR vào khung.');
+  } catch (error) {
+    showError(
+      'Không mở được camera. Hãy cấp quyền camera và sử dụng Chrome/Safari.'
+    );
+  }
+}
+
+async function stopScanner() {
+  if (!scanner || !scanning) return;
+
+  try {
+    await scanner.stop();
+  } catch (e) {}
+
+  scanning = false;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+}
+
+async function onScanSuccess(decodedText) {
+  if (processingQR) return;
+
+  const code = String(decodedText || '').trim().toUpperCase();
+
+  if (!/^SC\d+$/i.test(code)) {
+    beep('error');
+    showError('Mã QR không hợp lệ: ' + code);
+    return;
+  }
+
+  processingQR = true;
+  beep('success');
+
+  showNeutral('⏳', 'Đang điểm danh...', code);
+
+  try {
+    const result = await callApi({
+      api: 'checkin',
+      code: code,
+      callback: 'unused'
+    });
+
+    handleResult(result);
+
+  } catch (error) {
+    showError(error.message || 'Không thể kết nối hệ thống.');
+  }
+
+  setTimeout(function() {
+    processingQR = false;
+  }, 1500);
+}
+
+
+/* ============================================================
+   CHẾ ĐỘ NHẬP
+   ============================================================ */
+
+function setMode(mode) {
+  currentMode = mode;
+
+  const input = document.getElementById('input');
+
+  document.getElementById('modePhone').classList.toggle('active', mode === 'phone');
+  document.getElementById('modeCode').classList.toggle('active', mode === 'code');
+
+  if (mode === 'phone') {
+    document.getElementById('inputLabel').textContent = 'Nhập 4 số cuối SĐT';
+    input.placeholder = '0001';
+    input.maxLength = 4;
+    input.inputMode = 'numeric';
+  } else {
+    document.getElementById('inputLabel').textContent = 'Nhập mã cá nhân';
+    input.placeholder = 'SC001';
+    input.maxLength = 20;
+    input.inputMode = 'text';
+  }
+
+  input.value = '';
+  input.focus();
+}
+
+function handleEnter(event) {
+  if (event.key === 'Enter') {
+    submitCheckIn();
+  }
+}
+
+
+/* ============================================================
+   NHẬP THỦ CÔNG
+   ============================================================ */
+
+async function submitCheckIn() {
+  const input = document.getElementById('input');
+  const button = document.getElementById('checkinButton');
+
+  let value = input.value.trim();
+
+  if (!value) {
+    showError('Vui lòng nhập thông tin ca viên.');
+    input.focus();
+    return;
+  }
+
+  if (currentMode === 'phone' && !/^\d{4}$/.test(value)) {
+    showError('Vui lòng nhập đúng 4 số.');
+    input.focus();
+    return;
+  }
+
+  if (currentMode === 'code') {
+    value = value.toUpperCase();
+  }
+
+  button.disabled = true;
+  button.textContent = 'ĐANG KIỂM TRA...';
+
+  try {
+    let result;
+
+    if (currentMode === 'phone') {
+      result = await callApi({
+        api: 'checkin_phone',
+        value: value
+      });
+    } else {
+      result = await callApi({
+        api: 'checkin',
+        code: value,
+        callback: 'unused'
+      });
+    }
+
+    handleResult(result);
+
+  } catch (error) {
+    showError(error.message || 'Lỗi kết nối hệ thống.');
+  }
+
+  resetButton();
+}
+
+
+/* ============================================================
+   KẾT QUẢ
+   ============================================================ */
+
+function handleResult(data) {
+  if (!data) {
+    showError('Không nhận được kết quả.');
+    return;
+  }
+
+  if (data.success === true) {
+    beep('success');
+    showSuccess(data);
+    refreshDashboard();
+    clearInputLater();
+    return;
+  }
+
+  if (data.type === 'DUPLICATE') {
+    showDuplicate(data);
+    clearInputLater();
+    return;
+  }
+
+  if (data.type === 'MULTIPLE_MATCHES') {
+    showMultiple(data.matches || []);
+    return;
+  }
+
+  showError(data.message || 'Không thể điểm danh.');
+}
+
+function showSuccess(data) {
+  document.getElementById('result').innerHTML = `
+    <div class="result-card success-card">
+      <div class="result-icon">🟢</div>
+      <div class="result-title">ĐIỂM DANH THÀNH CÔNG</div>
+      <div class="result-name">${escapeHtml(data.hoTen || '')}</div>
+      <div class="result-info">${escapeHtml(data.be || '')}</div>
+      <div class="result-info">${escapeHtml(data.thoiGian || '')}</div>
+    </div>
+  `;
+}
+
+function showDuplicate(data) {
+  document.getElementById('result').innerHTML = `
+    <div class="result-card duplicate-card">
+      <div class="result-icon">🟡</div>
+      <div class="result-title">ĐÃ ĐIỂM DANH</div>
+      <div class="result-name">${escapeHtml(data.hoTen || '')}</div>
+      <div class="result-info">${escapeHtml(data.be || '')}</div>
+      <div class="result-info">
+        Đã điểm danh lúc:
+        <strong>${escapeHtml(data.thoiGianCu || '')}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function showMultiple(matches) {
+  let html = `
+    <div class="result-card duplicate-card">
+      <div class="result-icon">🟠</div>
+      <div class="multiple-title">CÓ NHIỀU CA VIÊN CÙNG 4 SỐ CUỐI</div>
+      <div class="result-info">Hãy chọn đúng người:</div>
+  `;
+
+  matches.forEach(function(person) {
+    html += `
+      <button class="person"
+        onclick="selectPerson('${escapeJs(person.ma)}')">
+        <div class="person-name">${escapeHtml(person.hoTen)}</div>
+        <div class="person-be">${escapeHtml(person.be)}</div>
+      </button>
+    `;
+  });
+
+  html += '</div>';
+  document.getElementById('result').innerHTML = html;
+}
+
+async function selectPerson(ma) {
+  document.getElementById('result').innerHTML =
+    '<div class="result-card duplicate-card">Đang điểm danh...</div>';
+
+  try {
+    const result = await callApi({
+      api: 'checkin',
+      code: ma,
+      callback: 'unused'
+    });
+
+    handleResult(result);
+  } catch (error) {
+    showError(error.message || 'Lỗi kết nối hệ thống.');
+  }
+}
+
+function showError(message) {
+  document.getElementById('result').innerHTML = `
+    <div class="result-card error-card">
+      <div class="result-icon">🔴</div>
+      <div class="result-title">KHÔNG THỂ ĐIỂM DANH</div>
+      <div class="result-info">${escapeHtml(message)}</div>
+    </div>
+  `;
+}
+
+function showNeutral(icon, title, message) {
+  document.getElementById('result').innerHTML = `
+    <div class="result-card" style="background:#f1f3f4;color:#444">
+      <div class="result-icon">${escapeHtml(icon)}</div>
+      <div class="result-title">${escapeHtml(title)}</div>
+      <div class="result-info">${escapeHtml(message)}</div>
+    </div>
+  `;
+}
+
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+
+async function refreshDashboard() {
+  try {
+    const data = await callApi({ api: 'dashboard' });
+
+    if (!data.success) {
+      document.getElementById('session').textContent =
+        data.message || 'Không có buổi điểm danh.';
+      return;
+    }
+
+    document.getElementById('session').textContent =
+      data.maBuoi + ' • ' + data.tenBuoi;
+
+    document.getElementById('total').textContent =
+      data.tongSo;
+
+    document.getElementById('present').textContent =
+      data.daCoMat;
+
+    document.getElementById('absent').textContent =
+      data.chuaCoMat;
+
+  } catch (error) {
+    document.getElementById('session').textContent =
+      'Không tải được thông tin buổi.';
+  }
+}
+
+
+/* ============================================================
+   ĐIỀU HƯỚNG
+   ============================================================ */
+
+function openAdmin() {
+  if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
+    alert('Chưa cấu hình URL Apps Script.');
+    return;
+  }
+
+  window.location.href = API_URL + '?page=admin';
+}
+
+
+/* ============================================================
+   TIỆN ÍCH
+   ============================================================ */
+
+function resetButton() {
+  const button = document.getElementById('checkinButton');
+  button.disabled = false;
+  button.textContent = 'ĐIỂM DANH';
+}
+
+function clearInputLater() {
+  const input = document.getElementById('input');
+  input.value = '';
+  input.focus();
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeJs(value) {
+  return String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'");
+}
+
+
+/* ============================================================
+   KHỞI ĐỘNG
+   ============================================================ */
+
+window.addEventListener('load', function() {
+  refreshDashboard();
+
+  // GitHub Pages là trang chính nên camera có thể chạy trực tiếp.
+  // Trình duyệt sẽ hỏi quyền camera ở lần đầu.
+  startScanner();
+});
+</script>
+</body>
+</html>
