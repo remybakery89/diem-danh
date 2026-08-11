@@ -408,7 +408,7 @@
  * Ví dụ:
  * https://script.google.com/macros/s/XXXXXXXX/exec
  */
-const API_URL = 'https://script.google.com/macros/s/AKfycbz2xHbefuMFmgGmEjcSLHe0IAV3mmfkybQP9B_-ZQ03nsufBIVFo9-sEGhweT-wEq9iQw/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzV79HNBWB6_8IFujMEbsUjMbkCaivLI3WwzKaI96AWpI3WB0IJrCjbfWJzcLNwbFXhsQ/exec';
 
 let scanner = null;
 let scanning = false;
@@ -1003,7 +1003,12 @@ function openAdmin() {
     return;
   }
 
-  window.location.href = API_URL + '?page=admin';
+  // Mở Quản trị ở tab mới, giữ nguyên trang điểm danh.
+  window.open(
+    API_URL + '?page=admin',
+    '_blank',
+    'noopener'
+  );
 }
 
 
