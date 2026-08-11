@@ -394,11 +394,12 @@
  * Ví dụ:
  * https://script.google.com/macros/s/XXXXXXXX/exec
  */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxEEPAp7NzPrxcmH7ld_6YgytMZHdThM_dwwCeQ2E_EVgtX-u1bIcv6kV04XyNwG17wFg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzV79HNBWB6_8IFujMEbsUjMbkCaivLI3WwzKaI96AWpI3WB0IJrCjbfWJzcLNwbFXhsQ/exec';
 
 let scanner = null;
 let scanning = false;
 let processingQR = false;
+let lockedQR = '';
 let currentMode = 'phone';
 let audioContext = null;
 
@@ -426,22 +427,51 @@ function beep(type) {
 
     if (!audioContext) return;
 
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
+    const patterns = {
+      success: [
+        { freq: 880, delay: 0, duration: 0.13 },
+        { freq: 1175, delay: 0.15, duration: 0.18 }
+      ],
 
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
+      duplicate: [
+        { freq: 620, delay: 0, duration: 0.14 },
+        { freq: 620, delay: 0.17, duration: 0.14 }
+      ],
 
-    oscillator.frequency.value = type === 'success' ? 880 : 440;
-    oscillator.type = 'sine';
+      error: [
+        { freq: 440, delay: 0, duration: 0.18 },
+        { freq: 300, delay: 0.20, duration: 0.24 }
+      ],
 
+      neutral: [
+        { freq: 700, delay: 0, duration: 0.12 }
+      ]
+    };
+
+    const pattern = patterns[type] || patterns.neutral;
     const now = audioContext.currentTime;
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
 
-    oscillator.start(now);
-    oscillator.stop(now + 0.17);
+    pattern.forEach(function(item) {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = item.freq;
+
+      const start = now + item.delay;
+      const end = start + item.duration;
+
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, end);
+
+      oscillator.start(start);
+      oscillator.stop(end + 0.01);
+    });
+
   } catch (e) {}
 }
 
@@ -555,9 +585,20 @@ async function stopScanner() {
 }
 
 async function onScanSuccess(decodedText) {
-  if (processingQR) return;
-
   const code = String(decodedText || '').trim().toUpperCase();
+
+  // Khi cùng một mã vẫn còn trong khung, KHÔNG quét/đối chiếu lại.
+  // Chỉ mở khóa khi camera nhìn thấy một mã khác.
+  if (code && code === lockedQR) {
+    return;
+  }
+
+  if (processingQR) {
+    return;
+  }
+
+  // Khóa ngay mã vừa nhận được để tránh callback liên tục từ camera.
+  lockedQR = code;
 
   if (!/^SC\d+$/i.test(code)) {
     beep('error');
@@ -566,7 +607,6 @@ async function onScanSuccess(decodedText) {
   }
 
   processingQR = true;
-  beep('success');
 
   showNeutral('⏳', 'Đang điểm danh...', code);
 
@@ -580,12 +620,11 @@ async function onScanSuccess(decodedText) {
     handleResult(result);
 
   } catch (error) {
+    beep('error');
     showError(error.message || 'Không thể kết nối hệ thống.');
-  }
-
-  setTimeout(function() {
+  } finally {
     processingQR = false;
-  }, 1500);
+  }
 }
 
 
@@ -685,6 +724,7 @@ async function submitCheckIn() {
 
 function handleResult(data) {
   if (!data) {
+    beep('error');
     showError('Không nhận được kết quả.');
     return;
   }
@@ -698,16 +738,19 @@ function handleResult(data) {
   }
 
   if (data.type === 'DUPLICATE') {
+    beep('duplicate');
     showDuplicate(data);
     clearInputLater();
     return;
   }
 
   if (data.type === 'MULTIPLE_MATCHES') {
+    beep('neutral');
     showMultiple(data.matches || []);
     return;
   }
 
+  beep('error');
   showError(data.message || 'Không thể điểm danh.');
 }
 
@@ -837,17 +880,16 @@ async function refreshDashboard() {
 
 function openAdmin() {
   if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
-    alert('Chưa cấu hình URL Apps Script.');
+    alert('Chưa cấu hình API_URL của Apps Script.');
     return;
   }
 
-  // Luôn mở một phiên Admin mới, tránh trình duyệt giữ trang Apps Script cũ.
+  // Mở Admin ở TAB MỚI.
+  // Tab GitHub giữ nguyên camera và trạng thái QR, không bị unload.
   const adminUrl =
-    API_URL +
-    '?page=admin&from=github&t=' +
-    Date.now();
+    API_URL + '?page=admin&from=github';
 
-  window.location.assign(adminUrl);
+  window.open(adminUrl, '_blank');
 }
 
 
@@ -889,19 +931,10 @@ function escapeJs(value) {
 
 window.addEventListener('load', function() {
   refreshDashboard();
-  startScanner();
-});
 
-/*
- * Khi rời GitHub sang trang Admin rồi quay lại,
- * trình duyệt có thể khôi phục trang từ bfcache.
- * Khi đó camera cũ đã bị dừng nhưng object scanner vẫn còn.
- * Nếu gặp trường hợp này, tải lại trang để camera khởi tạo sạch.
- */
-window.addEventListener('pageshow', function(event) {
-  if (event.persisted) {
-    window.location.reload();
-  }
+  // GitHub Pages là trang chính nên camera có thể chạy trực tiếp.
+  // Trình duyệt sẽ hỏi quyền camera ở lần đầu.
+  startScanner();
 });
 </script>
 </body>
