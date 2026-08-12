@@ -837,7 +837,11 @@ function handleResult(data) {
   if (data.success === true) {
     beep('success');
     showSuccess(data);
-    refreshDashboard();
+
+    // Không tải lại dashboard sau mỗi lần quét.
+    // Chỉ cập nhật thống kê cục bộ để quét người tiếp theo nhanh hơn.
+    updateLocalStatsAfterCheckIn();
+
     clearInputLater();
     return;
   }
@@ -943,6 +947,28 @@ function showNeutral(icon, title, message) {
       <div class="result-info">${escapeHtml(message)}</div>
     </div>
   `;
+}
+
+
+/* ============================================================
+   CẬP NHẬT THỐNG KÊ TẠI CHỖ
+   ============================================================ */
+
+function updateLocalStatsAfterCheckIn() {
+  const presentEl = document.getElementById('present');
+  const absentEl = document.getElementById('absent');
+
+  const present = Number(presentEl.textContent);
+
+  if (Number.isFinite(present)) {
+    presentEl.textContent = present + 1;
+
+    const absent = Number(absentEl.textContent);
+
+    if (Number.isFinite(absent) && absent > 0) {
+      absentEl.textContent = absent - 1;
+    }
+  }
 }
 
 
