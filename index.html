@@ -431,6 +431,10 @@ let checkinMembers = {};
 let checkinSession = null;
 let checkinAttendance = {};
 
+// QR đã được xác nhận local thì không chờ server để hiện kết quả.
+// Request ghi Sheet chạy nền và tự retry nếu phản hồi chậm.
+const pendingCheckins = {};
+
 
 /* ============================================================
    ÂM THANH
@@ -831,7 +835,6 @@ async function onScanSuccess(decodedText) {
   }
 
   // Không quét khi bộ dữ liệu ban đầu chưa sẵn sàng.
-  // Đây là chủ ý để tránh trạng thái lúc được/lúc không.
   if (!checkinConfigLoaded) {
     beep('neutral');
     showNeutral(
@@ -867,29 +870,202 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
-  processingQR = true;
-  showNeutral('⏳', 'Đang ghi nhận...', member.hoTen);
+  /*
+   * ==========================================================
+   * QUAN TRỌNG:
+   * Xác nhận QR NGAY bằng dữ liệu local.
+   *
+   * Không await Apps Script nữa.
+   * Người quét không phải chờ appendRow(), LockService,
+   * mạng hoặc JSONP response.
+   * ==========================================================
+   */
 
-  try {
-    // Chỉ còn 1 request: ghi nhận điểm danh trên server.
-    // Không tải lại buổi, danh sách hay dashboard.
-    const result = await callApi({
-      api: 'checkin',
-      code: code
-    }, {
-      retries: 0,
-      timeoutMs: 7000,
-      updateStatus: false
-    });
+  const localTime = formatLocalNow();
 
-    handleResult(result);
+  // Khóa mã ngay trên máy để callback camera không quét lại.
+  checkinAttendance[code] = {
+    thoiGian: localTime,
+    phuongThuc: 'QR',
+    pending: true
+  };
 
-  } catch (error) {
-    beep('error');
-    showError(error.message || 'Không thể ghi nhận điểm danh.');
-  } finally {
-    processingQR = false;
+  beep('success');
+
+  showSuccess({
+    ma: code,
+    hoTen: member.hoTen,
+    be: member.be,
+    thoiGian: localTime
+  });
+
+  updateLocalStatsAfterCheckIn();
+  clearInputLater();
+
+  // Gửi ghi nhận lên server ở nền.
+  // Không await và không hiển thị timeout cho người dùng.
+  syncCheckinInBackground(code, member, localTime);
+}
+
+
+/*
+ * ============================================================
+ * GHI ĐIỂM DANH NỀN
+ * ============================================================
+ *
+ * UI đã xác nhận local trước.
+ * Server chỉ làm nhiệm vụ ghi vào Google Sheet.
+ *
+ * Nếu request timeout nhưng server đã ghi thành công:
+ * - không hiện lỗi
+ * - retry có thể nhận DUPLICATE
+ * - DUPLICATE được coi là đã ghi thành công
+ *
+ * Nếu server thực sự từ chối (NOT_FOUND / NO_SESSION / SERVER_ERROR...):
+ * - rollback local
+ * - cập nhật lại thống kê
+ * - báo lỗi rõ ràng
+ */
+function syncCheckinInBackground(code, member, localTime, attempt) {
+
+  attempt = Number.isFinite(attempt) ? attempt : 0;
+
+  if (pendingCheckins[code]) return;
+
+  pendingCheckins[code] = true;
+
+  callApi({
+    api: 'checkin',
+    code: code
+  }, {
+    retries: 0,
+    timeoutMs: 7000,
+    updateStatus: false
+  })
+  .then(function(result) {
+
+    delete pendingCheckins[code];
+
+    if (result && result.success === true) {
+
+      // Server đã ghi thành công.
+      checkinAttendance[code] = {
+        thoiGian: result.thoiGian || localTime,
+        phuongThuc: 'QR',
+        pending: false
+      };
+
+      return;
+    }
+
+    if (result && result.type === 'DUPLICATE') {
+
+      // Trường hợp timeout ở lần đầu nhưng server thực tế đã ghi.
+      // DUPLICATE ở đây = dữ liệu đã tồn tại, coi như thành công.
+      checkinAttendance[code] = {
+        thoiGian: result.thoiGianCu || localTime,
+        phuongThuc: 'QR',
+        pending: false
+      };
+
+      return;
+    }
+
+    // Lỗi có kết quả rõ ràng từ server.
+    rollbackLocalCheckin(
+      code,
+      'Máy chủ không ghi nhận được điểm danh: ' +
+      ((result && result.message) || 'Lỗi không xác định.')
+    );
+  })
+  .catch(function(error) {
+
+    delete pendingCheckins[code];
+
+    /*
+     * Timeout / lỗi mạng KHÔNG đồng nghĩa ghi thất bại.
+     * Có thể appendRow đã chạy xong nhưng JSONP response
+     * về trình duyệt quá chậm.
+     *
+     * Retry tối đa 2 lần ở nền.
+     */
+    if (attempt < 2) {
+
+      setTimeout(function() {
+        syncCheckinInBackground(
+          code,
+          member,
+          localTime,
+          attempt + 1
+        );
+      }, 1200 * (attempt + 1));
+
+      return;
+    }
+
+    /*
+     * Sau 3 lần vẫn không nhận được phản hồi:
+     * KHÔNG hiện "máy chủ phản hồi quá lâu" cho người dùng.
+     *
+     * Giữ trạng thái local để người quét không bị bắt
+     * quét lại một người có khả năng đã được ghi.
+     */
+    checkinAttendance[code] = {
+      thoiGian: localTime,
+      phuongThuc: 'QR',
+      pending: true
+    };
+
+    console.warn(
+      'Check-in chưa xác nhận được từ server:',
+      code,
+      error && error.message
+    );
+  });
+}
+
+
+function rollbackLocalCheckin(code, message) {
+
+  if (!checkinAttendance[code]) return;
+
+  delete checkinAttendance[code];
+
+  const presentEl = document.getElementById('present');
+  const absentEl = document.getElementById('absent');
+
+  const present = Number(presentEl.textContent);
+  const absent = Number(absentEl.textContent);
+
+  if (Number.isFinite(present) && present > 0) {
+    presentEl.textContent = present - 1;
   }
+
+  if (Number.isFinite(absent)) {
+    absentEl.textContent = absent + 1;
+  }
+
+  beep('error');
+  showError(message);
+}
+
+
+function formatLocalNow() {
+
+  const now = new Date();
+
+  const pad = function(value) {
+    return String(value).padStart(2, '0');
+  };
+
+  return (
+    pad(now.getDate()) + '/' +
+    pad(now.getMonth() + 1) + '/' +
+    now.getFullYear() + ' ' +
+    pad(now.getHours()) + ':' +
+    pad(now.getMinutes()) + ':' +
+    pad(now.getSeconds())
+  );
 }
 
 
@@ -1102,20 +1278,52 @@ function showMultiple(matches) {
   document.getElementById('result').innerHTML = html;
 }
 
-async function selectPerson(ma) {
-  document.getElementById('result').innerHTML =
-    '<div class="result-card duplicate-card">Đang điểm danh...</div>';
+function selectPerson(ma) {
+  ma = String(ma || '').trim().toUpperCase();
 
-  try {
-    const result = await callApi({
-      api: 'checkin',
-      code: ma
-    });
-
-    handleResult(result);
-  } catch (error) {
-    showError(error.message || 'Lỗi kết nối hệ thống.');
+  if (!checkinConfigLoaded || !checkinSession) {
+    showError('Dữ liệu quét chưa sẵn sàng.');
+    return;
   }
+
+  const member = checkinMembers[ma];
+
+  if (!member) {
+    showError('Không tìm thấy ca viên với mã: ' + ma);
+    return;
+  }
+
+  if (checkinAttendance[ma]) {
+    beep('duplicate');
+    showDuplicate({
+      hoTen: member.hoTen,
+      be: member.be,
+      thoiGianCu: checkinAttendance[ma].thoiGian
+    });
+    return;
+  }
+
+  const localTime = formatLocalNow();
+
+  checkinAttendance[ma] = {
+    thoiGian: localTime,
+    phuongThuc: 'QR',
+    pending: true
+  };
+
+  beep('success');
+
+  showSuccess({
+    ma: ma,
+    hoTen: member.hoTen,
+    be: member.be,
+    thoiGian: localTime
+  });
+
+  updateLocalStatsAfterCheckIn();
+  clearInputLater();
+
+  syncCheckinInBackground(ma, member, localTime);
 }
 
 function showError(message) {
