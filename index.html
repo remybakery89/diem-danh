@@ -417,6 +417,12 @@ let lockedQR = '';
 let currentMode = 'phone';
 let audioContext = null;
 
+// Trạng thái riêng của dashboard.
+// Dashboard chỉ tải lúc mở trang và tự retry nếu lần đầu thất bại.
+let dashboardLoaded = false;
+let dashboardLoading = false;
+let dashboardRetryTimer = null;
+
 
 /* ============================================================
    ÂM THANH
@@ -503,8 +509,20 @@ async function callApi(params, options) {
 
   options = options || {};
 
-  const retries = Number.isFinite(options.retries) ? options.retries : 2;
-  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 8000;
+  const retries =
+    Number.isFinite(options.retries)
+      ? options.retries
+      : 2;
+
+  const timeoutMs =
+    Number.isFinite(options.timeoutMs)
+      ? options.timeoutMs
+      : 8000;
+
+  // Chỉ dashboard mới điều khiển dòng trạng thái kết nối.
+  // QR/SĐT không làm dòng trạng thái nhảy qua lại.
+  const updateStatus =
+    options.updateStatus === true;
 
   if (!API_URL || API_URL === 'DAN_URL_APPS_SCRIPT_VAO_DAY') {
     throw new Error('Chưa cấu hình API_URL của Apps Script.');
@@ -513,19 +531,30 @@ async function callApi(params, options) {
   let lastError = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+
     try {
-      if (attempt > 0) {
+
+      if (attempt > 0 && updateStatus) {
         setSystemStatus(
           'retrying',
           '🟡 Đang kết nối lại... (' +
-          (attempt + 1) + '/' + (retries + 1) + ')'
+          (attempt + 1) + '/' +
+          (retries + 1) + ')'
         );
+
         await sleep(500 * attempt);
       }
 
-      const result = await callApiOnce(params, timeoutMs);
+      const result =
+        await callApiOnce(params, timeoutMs);
 
-      setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
+      if (updateStatus) {
+        setSystemStatus(
+          'ready',
+          '🟢 Hệ thống sẵn sàng'
+        );
+      }
+
       return result;
 
     } catch (error) {
@@ -533,12 +562,15 @@ async function callApi(params, options) {
     }
   }
 
-  setSystemStatus(
-    'error',
-    '🔴 Kết nối không ổn định — hệ thống sẽ tự thử lại.'
-  );
+  if (updateStatus) {
+    setSystemStatus(
+      'error',
+      '🔴 Kết nối thông tin buổi không ổn định'
+    );
+  }
 
-  throw lastError || new Error('Không kết nối được máy chủ.');
+  throw lastError ||
+    new Error('Không kết nối được máy chủ.');
 }
 
 function callApiOnce(params, timeoutMs) {
@@ -838,8 +870,8 @@ function handleResult(data) {
     beep('success');
     showSuccess(data);
 
-    // Không tải lại dashboard sau mỗi lần quét.
-    // Chỉ cập nhật thống kê cục bộ để quét người tiếp theo nhanh hơn.
+    // Không gọi dashboard lại sau mỗi lần quét.
+    // Chỉ cập nhật bộ đếm ngay tại chỗ.
     updateLocalStatsAfterCheckIn();
 
     clearInputLater();
@@ -951,70 +983,135 @@ function showNeutral(icon, title, message) {
 
 
 /* ============================================================
-   CẬP NHẬT THỐNG KÊ TẠI CHỖ
-   ============================================================ */
-
-function updateLocalStatsAfterCheckIn() {
-  const presentEl = document.getElementById('present');
-  const absentEl = document.getElementById('absent');
-
-  const present = Number(presentEl.textContent);
-
-  if (Number.isFinite(present)) {
-    presentEl.textContent = present + 1;
-
-    const absent = Number(absentEl.textContent);
-
-    if (Number.isFinite(absent) && absent > 0) {
-      absentEl.textContent = absent - 1;
-    }
-  }
-}
-
-
-/* ============================================================
    DASHBOARD
    ============================================================ */
 
+function scheduleDashboardRetry() {
+
+  if (dashboardRetryTimer) {
+    clearTimeout(dashboardRetryTimer);
+  }
+
+  dashboardRetryTimer = setTimeout(function() {
+    dashboardRetryTimer = null;
+    refreshDashboard();
+  }, 5000);
+}
+
+
 async function refreshDashboard() {
 
-  setSystemStatus('loading', '🟡 Đang tải thông tin buổi...');
+  // Không cho nhiều request dashboard chạy chồng lên nhau.
+  if (dashboardLoading) return;
+
+  dashboardLoading = true;
+
+  // Chỉ hiện "Đang tải..." khi CHƯA từng lấy được thông tin buổi.
+  if (!dashboardLoaded) {
+    setSystemStatus(
+      'loading',
+      '🟡 Đang tải thông tin buổi...'
+    );
+  } else {
+    setSystemStatus(
+      'retrying',
+      '🟡 Đang kết nối lại thông tin buổi...'
+    );
+  }
 
   try {
 
     const data = await callApi(
       { api: 'dashboard' },
-      { retries: 3, timeoutMs: 7000 }
+      {
+        retries: 2,
+        timeoutMs: 6000,
+        updateStatus: true
+      }
     );
 
     if (!data || !data.success) {
 
-      document.getElementById('session').textContent =
-        (data && data.message) || 'Không có buổi điểm danh.';
+      if (!dashboardLoaded) {
+        document.getElementById('session').textContent =
+          (data && data.message) ||
+          'Chưa lấy được thông tin buổi.';
+      }
 
-      setSystemStatus('error', '🔴 Chưa lấy được thông tin buổi');
-
-      setTimeout(refreshDashboard, 5000);
+      dashboardLoading = false;
+      scheduleDashboardRetry();
       return;
     }
 
     document.getElementById('session').textContent =
       data.maBuoi + ' • ' + data.tenBuoi;
 
-    document.getElementById('total').textContent = data.tongSo;
-    document.getElementById('present').textContent = data.daCoMat;
-    document.getElementById('absent').textContent = data.chuaCoMat;
+    document.getElementById('total').textContent =
+      data.tongSo;
 
-    setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
+    document.getElementById('present').textContent =
+      data.daCoMat;
+
+    document.getElementById('absent').textContent =
+      data.chuaCoMat;
+
+    dashboardLoaded = true;
+    dashboardLoading = false;
+
+    if (dashboardRetryTimer) {
+      clearTimeout(dashboardRetryTimer);
+      dashboardRetryTimer = null;
+    }
+
+    setSystemStatus(
+      'ready',
+      '🟢 Hệ thống sẵn sàng'
+    );
 
   } catch (error) {
 
-    document.getElementById('session').textContent =
-      'Đang chờ kết nối...';
+    dashboardLoading = false;
 
-    setSystemStatus('retrying', '🟡 Đang tự kết nối lại...');
+    // Nếu đã lấy được buổi rồi thì KHÔNG xóa thông tin buổi.
+    // Chỉ retry âm thầm ở nền.
+    if (!dashboardLoaded) {
+      document.getElementById('session').textContent =
+        'Đang chờ kết nối...';
 
-    setTimeout(refreshDashboard, 5000);
+      setSystemStatus(
+        'retrying',
+        '🟡 Đang tự kết nối lại...'
+      );
+    }
+
+    scheduleDashboardRetry();
+  }
+}
+
+
+function updateLocalStatsAfterCheckIn() {
+
+  const presentEl =
+    document.getElementById('present');
+
+  const absentEl =
+    document.getElementById('absent');
+
+  const present =
+    Number(presentEl.textContent);
+
+  const absent =
+    Number(absentEl.textContent);
+
+  if (Number.isFinite(present)) {
+    presentEl.textContent = present + 1;
+  }
+
+  if (
+    Number.isFinite(absent) &&
+    absent > 0
+  ) {
+    absentEl.textContent = absent - 1;
   }
 }
 
@@ -1075,8 +1172,16 @@ function escapeJs(value) {
    ============================================================ */
 
 window.addEventListener('load', function() {
-  setSystemStatus('loading', '🟡 Đang khởi động hệ thống...');
+  setSystemStatus(
+    'loading',
+    '🟡 Đang khởi động hệ thống...'
+  );
+
+  // Dashboard chỉ tải lúc mở trang.
+  // QR sau đó không gọi lại dashboard.
   refreshDashboard();
+
+  // Camera chạy độc lập với dashboard.
   startScanner();
 });
 </script>
