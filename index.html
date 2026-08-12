@@ -408,7 +408,7 @@
  * Ví dụ:
  * https://script.google.com/macros/s/XXXXXXXX/exec
  */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxgCb1pev_iobOB3mrZMHrGrftTPrVubBxA6ARvADdYOSxw_0ypDrHhr4HMse0yWN6-cw/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwgsUzIzcBIB5nE2ByuPn8NUVKk19pMSYuhamHro1Qvw9sMZyEi_xbKQe8ecEz_XwIA4A/exec';
 
 let scanner = null;
 let scanning = false;
@@ -422,6 +422,13 @@ let audioContext = null;
 let dashboardLoaded = false;
 let dashboardLoading = false;
 let dashboardRetryTimer = null;
+
+// Dữ liệu dùng riêng cho việc quét QR.
+// Tải một lần khi mở trang và giữ trong trình duyệt.
+let checkinConfigLoaded = false;
+let checkinConfigLoading = false;
+let checkinMembers = {};
+let checkinSession = null;
 
 
 /* ============================================================
@@ -509,10 +516,14 @@ async function callApi(params, options) {
 
   options = options || {};
 
+  // Không tự retry các request điểm danh.
+  // Retry một request ghi dữ liệu có thể khiến lần ghi đầu đã thành công
+  // nhưng phản hồi bị mất, rồi request thứ hai lại thành DUPLICATE.
+  // Dashboard nếu cần retry sẽ truyền retries: 2 riêng.
   const retries =
     Number.isFinite(options.retries)
       ? options.retries
-      : 2;
+      : 0;
 
   const timeoutMs =
     Number.isFinite(options.timeoutMs)
@@ -639,6 +650,52 @@ function setSystemStatus(type, text) {
 
 
 /* ============================================================
+   CẤU HÌNH QUÉT QR - TẢI MỘT LẦN
+   ============================================================ */
+
+async function loadCheckinConfig() {
+  if (checkinConfigLoading) return;
+
+  checkinConfigLoading = true;
+
+  try {
+    const data = await callApi(
+      { api: 'checkin_config' },
+      {
+        retries: 2,
+        timeoutMs: 6000,
+        updateStatus: false
+      }
+    );
+
+    if (!data || !data.success) {
+      throw new Error(
+        (data && data.message) ||
+        'Không tải được dữ liệu quét.'
+      );
+    }
+
+    checkinMembers = data.members || {};
+    checkinSession = data.buoi || null;
+    checkinConfigLoaded = true;
+
+    if (checkinSession) {
+      document.getElementById('session').textContent =
+        checkinSession.maBuoi + ' • ' +
+        checkinSession.tenBuoi;
+    }
+
+  } catch (error) {
+    // Không chặn camera nếu cấu hình tải chậm/lỗi.
+    // Backend vẫn kiểm tra mã khi nhận request.
+    checkinConfigLoaded = false;
+
+  } finally {
+    checkinConfigLoading = false;
+  }
+}
+
+/* ============================================================
    QR SCANNER
    ============================================================ */
 
@@ -673,7 +730,7 @@ async function startScanner(retryCount) {
     document.getElementById('startBtn').disabled = true;
     document.getElementById('stopBtn').disabled = false;
 
-    setSystemStatus('ready', '🟢 Hệ thống sẵn sàng');
+    setSystemStatus('ready', '🟢 Camera sẵn sàng');
 
     showNeutral(
       '📷',
@@ -743,15 +800,27 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
+  // Nếu danh sách mã đã tải, kiểm tra ngay trên máy.
+  // Không cần chờ Apps Script chỉ để biết mã có tồn tại hay không.
+  if (
+    checkinConfigLoaded &&
+    !checkinMembers[code]
+  ) {
+    beep('error');
+    showError('Không tìm thấy ca viên với mã: ' + code);
+    return;
+  }
+
   processingQR = true;
 
-  showNeutral('⏳', 'Đang điểm danh...', code);
+  showNeutral('⏳', 'Đang ghi nhận...', code);
 
   try {
+    // Đây là request DUY NHẤT cho mỗi lần quét hợp lệ.
+    // Không tải lại dashboard / thông tin buổi.
     const result = await callApi({
       api: 'checkin',
-      code: code,
-      callback: 'unused'
+      code: code
     });
 
     handleResult(result);
@@ -840,8 +909,7 @@ async function submitCheckIn() {
     } else {
       result = await callApi({
         api: 'checkin',
-        code: value,
-        callback: 'unused'
+        code: value
       });
     }
 
@@ -951,8 +1019,7 @@ async function selectPerson(ma) {
   try {
     const result = await callApi({
       api: 'checkin',
-      code: ma,
-      callback: 'unused'
+      code: ma
     });
 
     handleResult(result);
@@ -1174,14 +1241,18 @@ function escapeJs(value) {
 window.addEventListener('load', function() {
   setSystemStatus(
     'loading',
-    '🟡 Đang khởi động hệ thống...'
+    '🟡 Đang khởi động camera...'
   );
 
+  // Tải dữ liệu quét một lần.
+  // Camera và dữ liệu chạy song song, không chờ dashboard.
+  loadCheckinConfig();
+
   // Dashboard chỉ tải lúc mở trang.
-  // QR sau đó không gọi lại dashboard.
+  // QR sau đó tuyệt đối không gọi lại dashboard.
   refreshDashboard();
 
-  // Camera chạy độc lập với dashboard.
+  // Camera chạy độc lập với cả hai request trên.
   startScanner();
 });
 </script>
