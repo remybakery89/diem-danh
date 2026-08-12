@@ -408,7 +408,7 @@
  * Ví dụ:
  * https://script.google.com/macros/s/XXXXXXXX/exec
  */
-const API_URL = 'https://script.google.com/macros/s/AKfycbwgsUzIzcBIB5nE2ByuPn8NUVKk19pMSYuhamHro1Qvw9sMZyEi_xbKQe8ecEz_XwIA4A/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyhd551ivVpB2GvNiMsabSUdMfNTb2gp1Tw1uSsJ9k9CF16iZPbs4hG9-n2hsdMfVjHIA/exec';
 
 let scanner = null;
 let scanning = false;
@@ -429,6 +429,7 @@ let checkinConfigLoaded = false;
 let checkinConfigLoading = false;
 let checkinMembers = {};
 let checkinSession = null;
+let checkinAttendance = {};
 
 
 /* ============================================================
@@ -653,17 +654,20 @@ function setSystemStatus(type, text) {
    CẤU HÌNH QUÉT QR - TẢI MỘT LẦN
    ============================================================ */
 
-async function loadCheckinConfig() {
-  if (checkinConfigLoading) return;
+async function loadCheckinConfig(retryCount) {
+  if (checkinConfigLoading || checkinConfigLoaded) return;
 
   checkinConfigLoading = true;
+  retryCount = Number.isFinite(retryCount) ? retryCount : 0;
+
+  setSystemStatus('loading', '🟡 Đang tải dữ liệu quét...');
 
   try {
     const data = await callApi(
       { api: 'checkin_config' },
       {
-        retries: 2,
-        timeoutMs: 6000,
+        retries: 0,
+        timeoutMs: 8000,
         updateStatus: false
       }
     );
@@ -676,6 +680,7 @@ async function loadCheckinConfig() {
     }
 
     checkinMembers = data.members || {};
+    checkinAttendance = data.attendance || {};
     checkinSession = data.buoi || null;
     checkinConfigLoaded = true;
 
@@ -683,15 +688,47 @@ async function loadCheckinConfig() {
       document.getElementById('session').textContent =
         checkinSession.maBuoi + ' • ' +
         checkinSession.tenBuoi;
+    } else {
+      document.getElementById('session').textContent =
+        'Hôm nay không có buổi điểm danh.';
     }
 
+    const stats = data.stats || {};
+    document.getElementById('total').textContent =
+      Number.isFinite(Number(stats.tongSo)) ? stats.tongSo : '-';
+    document.getElementById('present').textContent =
+      Number.isFinite(Number(stats.daCoMat)) ? stats.daCoMat : '-';
+    document.getElementById('absent').textContent =
+      Number.isFinite(Number(stats.chuaCoMat)) ? stats.chuaCoMat : '-';
+
+    setSystemStatus('ready', '🟢 Sẵn sàng quét');
+
   } catch (error) {
-    // Không chặn camera nếu cấu hình tải chậm/lỗi.
-    // Backend vẫn kiểm tra mã khi nhận request.
     checkinConfigLoaded = false;
 
+    if (retryCount < 3) {
+      setSystemStatus(
+        'retrying',
+        '🟡 Đang kết nối lại dữ liệu quét...'
+      );
+
+      setTimeout(function() {
+        checkinConfigLoading = false;
+        loadCheckinConfig(retryCount + 1);
+      }, 1500);
+
+      return;
+    }
+
+    setSystemStatus(
+      'error',
+      '🔴 Chưa tải được dữ liệu quét. Hãy tải lại trang.'
+    );
+
   } finally {
-    checkinConfigLoading = false;
+    if (retryCount >= 3 || checkinConfigLoaded) {
+      checkinConfigLoading = false;
+    }
   }
 }
 
@@ -781,17 +818,10 @@ async function stopScanner() {
 async function onScanSuccess(decodedText) {
   const code = String(decodedText || '').trim().toUpperCase();
 
-  // Khi cùng một mã vẫn còn trong khung, KHÔNG quét/đối chiếu lại.
-  // Chỉ mở khóa khi camera nhìn thấy một mã khác.
-  if (code && code === lockedQR) {
-    return;
-  }
+  // Cùng một mã còn nằm trong khung thì bỏ qua callback lặp.
+  if (code && code === lockedQR) return;
+  if (processingQR) return;
 
-  if (processingQR) {
-    return;
-  }
-
-  // Khóa ngay mã vừa nhận được để tránh callback liên tục từ camera.
   lockedQR = code;
 
   if (!/^SC\d+$/i.test(code)) {
@@ -800,34 +830,63 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
-  // Nếu danh sách mã đã tải, kiểm tra ngay trên máy.
-  // Không cần chờ Apps Script chỉ để biết mã có tồn tại hay không.
-  if (
-    checkinConfigLoaded &&
-    !checkinMembers[code]
-  ) {
+  // Không quét khi bộ dữ liệu ban đầu chưa sẵn sàng.
+  // Đây là chủ ý để tránh trạng thái lúc được/lúc không.
+  if (!checkinConfigLoaded) {
+    beep('neutral');
+    showNeutral(
+      '⏳',
+      'Đang tải dữ liệu',
+      'Chờ hệ thống sẵn sàng rồi quét lại.'
+    );
+    return;
+  }
+
+  if (!checkinSession) {
+    beep('error');
+    showError('Hôm nay không có buổi điểm danh.');
+    return;
+  }
+
+  const member = checkinMembers[code];
+
+  // Đối chiếu mã + trạng thái đã điểm danh NGAY TRÊN MÁY.
+  if (!member) {
     beep('error');
     showError('Không tìm thấy ca viên với mã: ' + code);
     return;
   }
 
-  processingQR = true;
+  if (checkinAttendance[code]) {
+    beep('duplicate');
+    showDuplicate({
+      hoTen: member.hoTen,
+      be: member.be,
+      thoiGianCu: checkinAttendance[code].thoiGian
+    });
+    return;
+  }
 
-  showNeutral('⏳', 'Đang ghi nhận...', code);
+  processingQR = true;
+  showNeutral('⏳', 'Đang ghi nhận...', member.hoTen);
 
   try {
-    // Đây là request DUY NHẤT cho mỗi lần quét hợp lệ.
-    // Không tải lại dashboard / thông tin buổi.
+    // Chỉ còn 1 request: ghi nhận điểm danh trên server.
+    // Không tải lại buổi, danh sách hay dashboard.
     const result = await callApi({
       api: 'checkin',
       code: code
+    }, {
+      retries: 0,
+      timeoutMs: 7000,
+      updateStatus: false
     });
 
     handleResult(result);
 
   } catch (error) {
     beep('error');
-    showError(error.message || 'Không thể kết nối hệ thống.');
+    showError(error.message || 'Không thể ghi nhận điểm danh.');
   } finally {
     processingQR = false;
   }
@@ -893,6 +952,26 @@ async function submitCheckIn() {
 
   if (currentMode === 'code') {
     value = value.toUpperCase();
+
+    if (checkinConfigLoaded) {
+      const member = checkinMembers[value];
+
+      if (!member) {
+        beep('error');
+        showError('Không tìm thấy ca viên với mã: ' + value);
+        return;
+      }
+
+      if (checkinAttendance[value]) {
+        beep('duplicate');
+        showDuplicate({
+          hoTen: member.hoTen,
+          be: member.be,
+          thoiGianCu: checkinAttendance[value].thoiGian
+        });
+        return;
+      }
+    }
   }
 
   button.disabled = true;
@@ -938,10 +1017,13 @@ function handleResult(data) {
     beep('success');
     showSuccess(data);
 
-    // Không gọi dashboard lại sau mỗi lần quét.
-    // Chỉ cập nhật bộ đếm ngay tại chỗ.
-    updateLocalStatsAfterCheckIn();
+    // Cập nhật bộ dữ liệu local ngay sau khi server ghi thành công.
+    checkinAttendance[data.ma] = {
+      thoiGian: data.thoiGian || '',
+      phuongThuc: 'QR'
+    };
 
+    updateLocalStatsAfterCheckIn();
     clearInputLater();
     return;
   }
@@ -949,6 +1031,14 @@ function handleResult(data) {
   if (data.type === 'DUPLICATE') {
     beep('duplicate');
     showDuplicate(data);
+
+    if (data.ma) {
+      checkinAttendance[data.ma] = {
+        thoiGian: data.thoiGianCu || '',
+        phuongThuc: data.phuongThuc || ''
+      };
+    }
+
     clearInputLater();
     return;
   }
@@ -1244,15 +1334,11 @@ window.addEventListener('load', function() {
     '🟡 Đang khởi động camera...'
   );
 
-  // Tải dữ liệu quét một lần.
-  // Camera và dữ liệu chạy song song, không chờ dashboard.
+  // Chỉ tải MỘT lần: buổi + danh sách + trạng thái điểm danh.
+  // Đây là bộ dữ liệu dùng xuyên suốt phiên quét.
   loadCheckinConfig();
 
-  // Dashboard chỉ tải lúc mở trang.
-  // QR sau đó tuyệt đối không gọi lại dashboard.
-  refreshDashboard();
-
-  // Camera chạy độc lập với cả hai request trên.
+  // Camera chạy độc lập; callback QR chỉ hoạt động khi dữ liệu đã sẵn sàng.
   startScanner();
 });
 </script>
