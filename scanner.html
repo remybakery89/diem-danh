@@ -147,7 +147,7 @@ function handleResult(result, code){
 
 let audioCtx = null;
 
-function beep(freq = 880, duration = 0.15) {
+async function beep(freq = 880, duration = 0.15) {
 
   try {
 
@@ -156,12 +156,25 @@ function beep(freq = 880, duration = 0.15) {
       window.webkitAudioContext;
 
     if (!AudioContextClass) {
-      alert("iPhone không hỗ trợ Web Audio");
+      alert("Trình duyệt không hỗ trợ Web Audio");
       return;
     }
 
     if (!audioCtx) {
       audioCtx = new AudioContextClass();
+    }
+
+    // QUAN TRỌNG với iPhone/Safari
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
+
+    if (audioCtx.state !== "running") {
+      alert(
+        "AudioContext chưa hoạt động: " +
+        audioCtx.state
+      );
+      return;
     }
 
     const osc =
@@ -171,6 +184,7 @@ function beep(freq = 880, duration = 0.15) {
       audioCtx.createGain();
 
     osc.type = "sine";
+
     osc.frequency.setValueAtTime(
       freq,
       audioCtx.currentTime
@@ -184,10 +198,13 @@ function beep(freq = 880, duration = 0.15) {
     osc.connect(gain);
     gain.connect(audioCtx.destination);
 
-    osc.start();
+    const now =
+      audioCtx.currentTime;
+
+    osc.start(now);
 
     osc.stop(
-      audioCtx.currentTime + duration
+      now + duration
     );
 
   } catch (e) {
