@@ -146,67 +146,40 @@ function handleResult(result, code){
 }
 
 let audioCtx = null;
-let audioUnlocked = false;
 
-function initAudio(){
+function beep(freq = 880, duration = 0.15) {
 
-  try{
+  try {
 
-    const C =
+    const AudioContextClass =
       window.AudioContext ||
       window.webkitAudioContext;
 
-    if (!C) return;
-
-    if (!audioCtx){
-      audioCtx = new C();
+    if (!AudioContextClass) {
+      alert("iPhone không hỗ trợ Web Audio");
+      return;
     }
 
-    if (audioCtx.state === "suspended"){
-      audioCtx.resume();
+    if (!audioCtx) {
+      audioCtx = new AudioContextClass();
     }
 
-    audioUnlocked = true;
-
-  }catch(e){
-
-    console.log("Audio init:", e);
-
-  }
-
-}
-
-
-function unlockAudio(){
-
-  try{
-
-    const C =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-    if (!C) return;
-
-    if (!audioCtx){
-      audioCtx = new C();
-    }
-
-    if (audioCtx.state === "suspended"){
-      audioCtx.resume();
-    }
-
-    /*
-     * Tạo một âm cực ngắn, âm lượng bằng 0
-     * để iPhone xác nhận AudioContext đã được
-     * khởi động từ thao tác chạm của người dùng.
-     */
     const osc =
       audioCtx.createOscillator();
 
     const gain =
       audioCtx.createGain();
 
-    gain.gain.value = 0.001;
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(
+      freq,
+      audioCtx.currentTime
+    );
+
+    gain.gain.setValueAtTime(
+      0.20,
+      audioCtx.currentTime
+    );
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -214,66 +187,15 @@ function unlockAudio(){
     osc.start();
 
     osc.stop(
-      audioCtx.currentTime + 0.03
+      audioCtx.currentTime + duration
     );
 
-    audioUnlocked = true;
+  } catch (e) {
 
-  }catch(e){
-
-    console.log("Audio unlock:", e);
-
-  }
-
-}
-
-
-async function beep(freq=880, duration=.10){
-
-  try{
-
-    if (!audioCtx){
-      initAudio();
-    }
-
-    if (!audioCtx){
-      return;
-    }
-
-    if (audioCtx.state === "suspended"){
-      await audioCtx.resume();
-    }
-
-    if (audioCtx.state !== "running"){
-      return;
-    }
-
-    const osc =
-      audioCtx.createOscillator();
-
-    const gain =
-      audioCtx.createGain();
-
-    osc.frequency.value = freq;
-    osc.type = "sine";
-
-    gain.gain.value = .20;
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    const now =
-      audioCtx.currentTime;
-
-    osc.start(now);
-
-    osc.stop(
-      now + duration
+    alert(
+      "Lỗi âm thanh: " +
+      (e.message || e)
     );
-
-  }catch(e){
-
-    console.log("Beep error:", e);
 
   }
 
@@ -314,23 +236,7 @@ function start(){
   });
 }
 
-document.addEventListener(
-  "touchstart",
-  unlockAudio,
-  { passive: true }
-);
 
-document.addEventListener(
-  "pointerdown",
-  unlockAudio,
-  { passive: true }
-);
-
-document.addEventListener(
-  "click",
-  unlockAudio,
-  { passive: true }
-);
   
 window.addEventListener("load", start);
 </script>
