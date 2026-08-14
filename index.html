@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+  <!-- PWA - Điểm danh SCYC -->
+<link rel="manifest" href="/diem-danh/manifest.json">
+
+<meta name="theme-color" content="#f59e0b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Điểm danh SCYC">
+
+<link rel="apple-touch-icon" href="/diem-danh/icons/icon-192.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Điểm danh ca viên</title>
@@ -1549,6 +1559,16 @@ window.addEventListener('load', function() {
   // Camera chạy độc lập; callback QR chỉ hoạt động khi dữ liệu đã sẵn sàng.
   startScanner();
 });
+</script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/diem-danh/sw.js')
+      .catch(function (error) {
+        console.log('Service Worker chưa đăng ký:', error);
+      });
+  });
+}
 </script>
 </body>
 </html>
