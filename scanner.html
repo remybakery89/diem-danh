@@ -30,22 +30,6 @@
     <div class="card">
       <div id="reader"></div>
       <div class="hint">Đưa mã QR vào khung. Quét xong hệ thống tự điểm danh.</div>
-      <button
-  onclick="beep(880, 0.2)"
-  style="
-    width:100%;
-    margin-top:12px;
-    padding:14px;
-    border:0;
-    border-radius:12px;
-    background:#4285f4;
-    color:white;
-    font-size:17px;
-    font-weight:bold;
-  "
->
-  🔊 TEST ÂM THANH
-</button>
       <div id="status" class="status"></div>
     </div>
   </div>
@@ -123,16 +107,34 @@ function callCheckIn(code){
 
 function handleResult(result, code){
   if (result && result.success === true){
-    show("success","🟢","ĐIỂM DANH THÀNH CÔNG",
-         result.hoTen || "", result.be || "", result.ma || code,
-         result.thoiGian || "");
-    beep();
-  } else if (result && result.type === "DUPLICATE"){
-    show("warning","🟡","ĐÃ ĐIỂM DANH RỒI",
-         result.hoTen || "", result.be || "", result.ma || code,
-         result.thoiGianCu || "");
-    beep(330, 0.12);
-  } else {
+
+  show(
+    "success",
+    "🟢",
+    "ĐIỂM DANH THÀNH CÔNG",
+    result.hoTen || "",
+    result.be || "",
+    result.ma || code,
+    result.thoiGian || ""
+  );
+
+  beep("success");
+
+} else if (result && result.type === "DUPLICATE"){
+
+  show(
+    "warning",
+    "🟡",
+    "ĐÃ ĐIỂM DANH RỒI",
+    result.hoTen || "",
+    result.be || "",
+    result.ma || code,
+    result.thoiGianCu || ""
+  );
+
+  beep("duplicate");
+
+} else {
     show("error","❌",
          result?.message || "Không thể điểm danh",
          result?.hoTen || "", result?.be || "", result?.ma || code);
@@ -145,73 +147,37 @@ function handleResult(result, code){
   }, 1600);
 }
 
-let audioCtx = null;
-
-async function beep(freq = 880, duration = 0.15) {
+function beep(type = "success") {
 
   try {
 
-    const AudioContextClass =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-    if (!AudioContextClass) {
-      alert("Trình duyệt không hỗ trợ Web Audio");
-      return;
-    }
-
-    if (!audioCtx) {
-      audioCtx = new AudioContextClass();
-    }
-
-    // QUAN TRỌNG với iPhone/Safari
-    if (audioCtx.state === "suspended") {
-      await audioCtx.resume();
-    }
-
-    if (audioCtx.state !== "running") {
-      alert(
-        "AudioContext chưa hoạt động: " +
-        audioCtx.state
+    const audio =
+      document.getElementById(
+        type === "duplicate"
+          ? "beepDuplicate"
+          : "beepSuccess"
       );
-      return;
+
+    if (!audio) return;
+
+    audio.currentTime = 0;
+
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+      playPromise.catch(function(error) {
+        console.log(
+          "Không phát được âm thanh:",
+          error
+        );
+      });
     }
-
-    const osc =
-      audioCtx.createOscillator();
-
-    const gain =
-      audioCtx.createGain();
-
-    osc.type = "sine";
-
-    osc.frequency.setValueAtTime(
-      freq,
-      audioCtx.currentTime
-    );
-
-    gain.gain.setValueAtTime(
-      0.20,
-      audioCtx.currentTime
-    );
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    const now =
-      audioCtx.currentTime;
-
-    osc.start(now);
-
-    osc.stop(
-      now + duration
-    );
 
   } catch (e) {
 
-    alert(
-      "Lỗi âm thanh: " +
-      (e.message || e)
+    console.log(
+      "Lỗi âm thanh:",
+      e
     );
 
   }
@@ -257,5 +223,18 @@ function start(){
   
 window.addEventListener("load", start);
 </script>
+<audio
+  id="beepSuccess"
+  src="sounds/success.wav"
+  preload="auto"
+  playsinline>
+</audio>
+
+<audio
+  id="beepDuplicate"
+  src="sounds/duplicate.wav"
+  preload="auto"
+  playsinline>
+</audio>
 </body>
 </html>
