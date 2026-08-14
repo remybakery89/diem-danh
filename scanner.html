@@ -190,7 +190,7 @@ function unlockAudio(){
     const gain =
       audioCtx.createGain();
 
-    gain.gain.value = 0;
+    gain.gain.value = 0.001;
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -198,7 +198,7 @@ function unlockAudio(){
     osc.start();
 
     osc.stop(
-      audioCtx.currentTime + 0.01
+      audioCtx.currentTime + 0.03
     );
 
     audioUnlocked = true;
@@ -212,7 +212,7 @@ function unlockAudio(){
 }
 
 
-function beep(freq=880, duration=.10){
+async function beep(freq=880, duration=.10){
 
   try{
 
@@ -225,7 +225,11 @@ function beep(freq=880, duration=.10){
     }
 
     if (audioCtx.state === "suspended"){
-      audioCtx.resume();
+      await audioCtx.resume();
+    }
+
+    if (audioCtx.state !== "running"){
+      return;
     }
 
     const osc =
