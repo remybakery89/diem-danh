@@ -103,13 +103,13 @@
 
     /* QR */
     #reader {
-      width: 100%;
-      overflow: hidden;
-      border-radius: 15px;
-      background: #111;
-      min-height: 280px;
-    }
-
+  width: 100%;
+  overflow: hidden;
+  overflow-anchor: none;
+  border-radius: 15px;
+  background: #111;
+  min-height: 280px;
+}
     #reader video {
       width: 100% !important;
       border-radius: 15px;
@@ -233,6 +233,7 @@
 
     #result {
   margin: 0 0 16px;
+  overflow-anchor: none;
 }
 
     .result-card {
