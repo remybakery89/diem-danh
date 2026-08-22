@@ -901,15 +901,24 @@ async function onScanSuccess(decodedText) {
 
   beep('success');
 
-  showSuccess({
-    ma: code,
-    hoTen: member.hoTen,
-    be: member.be,
-    thoiGian: localTime
-  });
+  const qrScrollY = window.scrollY;
 
-  updateLocalStatsAfterCheckIn();
-  clearInputLater();
+showSuccess({
+  ma: code,
+  hoTen: member.hoTen,
+  be: member.be,
+  thoiGian: localTime
+});
+
+updateLocalStatsAfterCheckIn();
+
+requestAnimationFrame(() => {
+  window.scrollTo(0, qrScrollY);
+
+  requestAnimationFrame(() => {
+    window.scrollTo(0, qrScrollY);
+  });
+});
 
   // Gửi ghi nhận lên server ở nền.
   // Không await và không hiển thị timeout cho người dùng.
