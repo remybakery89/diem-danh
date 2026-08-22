@@ -10,8 +10,8 @@
     *{box-sizing:border-box}body{margin:0}.wrap{max-width:720px;margin:0 auto;padding:20px 16px 40px}
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;margin:12px 0;box-shadow:0 4px 18px rgba(0,0,0,.05)}
     h1,h2,p{margin-top:0}.muted{color:#6b7280}.hidden{display:none!important}
-    input,button{width:100%;min-height:48px;border-radius:12px;font:inherit}input{border:1px solid #d1d5db;padding:0 14px;margin:6px 0 10px}button{border:0;background:#111827;color:#fff;font-weight:700;padding:0 14px;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}button:disabled{opacity:.55;cursor:not-allowed}
-    .row{display:flex;gap:10px}.row>*{flex:1}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:13px;font-weight:700}.program{padding:15px 0;border-top:1px solid #eee}.program:first-child{border-top:0}.program h3{margin:0 0 6px}.program p{margin:4px 0}.status{font-weight:700}.ok{color:#15803d}.warn{color:#b45309}.danger{color:#b91c1c}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top button{width:auto;min-height:40px}.notice{padding:12px;border-radius:12px;background:#f9fafb;margin:10px 0}.small{font-size:13px}.spinner{display:inline-block}
+    input,button{width:100%;min-height:48px;border-radius:12px;font:inherit}input{border:1px solid #d1d5db;padding:0 14px;margin:6px 0 10px}button{border:0;background:#111827;color:#fff;font-weight:700;padding:0 14px;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}button.danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}button:disabled{opacity:.55;cursor:not-allowed}
+    .row{display:flex;gap:10px}.row>*{flex:1}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:13px;font-weight:700}.program{padding:15px 0;border-top:1px solid #eee}.program:first-child{border-top:0}.program h3{margin:0 0 6px}.program p{margin:4px 0}.status{font-weight:700}.ok{color:#15803d}.warn{color:#b45309}.danger-text{color:#b91c1c}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top button{width:auto;min-height:40px}.notice{padding:12px;border-radius:12px;background:#f9fafb;margin:10px 0}.small{font-size:13px}
   </style>
 </head>
 <body>
@@ -74,26 +74,27 @@ async function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Đang đăng nhập...';
   try{
     const r=await jsonp({api:'registration_login',ma,last4});
-    if(!r.success){show('loginMsg',r.message||'Đăng nhập thất bại.','danger');return}
+    if(!r.success){show('loginMsg',r.message||'Đăng nhập thất bại.','danger-text');return}
     token=r.token;member=r.member;sessionStorage.setItem('memberRegistrationToken',token);sessionStorage.setItem('memberRegistrationMember',JSON.stringify(member));setLoggedIn();await refreshAll();
-  }catch(e){show('loginMsg',e.message,'danger')}finally{btn.disabled=false;btn.textContent='Đăng nhập'}
+  }catch(e){show('loginMsg',e.message,'danger-text')}finally{btn.disabled=false;btn.textContent='Đăng nhập'}
 }
-function programStatus(p){const s=String(p.trangThai||'');let cls=s==='ĐANG MỞ'?'ok':(s==='ĐÃ ĐÓNG'||s==='ĐÃ KẾT THÚC'?'danger':'warn');return `<span class="status ${cls}">${esc(s)}</span>`}
+function programStatus(p){const s=String(p.trangThai||'');let cls=s==='ĐANG MỞ'?'ok':(s==='ĐÃ ĐÓNG'||s==='ĐÃ KẾT THÚC'?'danger-text':'warn');return `<span class="status ${cls}">${esc(s)}</span>`}
 function renderPrograms(list){
   const box=document.getElementById('programs');
   if(!list?.length){box.innerHTML='<p class="muted">Chưa có chương trình.</p>';return}
   box.innerHTML=list.map(p=>{
     const mine=currentMine.find(x=>x.maBuoi===p.maBuoi&&x.trangThai==='ĐÃ ĐĂNG KÝ');
     const canRegister=p.trangThai==='ĐANG MỞ' && !mine;
-    return `<div class="program"><h3>${esc(p.tenBuoi)}</h3><p>📅 ${esc(p.ngay)}${p.gio?' · '+esc(p.gio):''}</p>${p.diaDiem?`<p>📍 ${esc(p.diaDiem)}</p>`:''}<p>${programStatus(p)}${p.gioiHan?' · Giới hạn '+esc(p.gioiHan):''}${p.doiTuong&&p.doiTuong!=='TẤT CẢ'?' · '+esc(p.doiTuong):''}</p>${p.ghiChu?`<p class="muted small">${esc(p.ghiChu)}</p>`:''}<div style="margin-top:10px">${mine?'<span class="badge ok">Đã đăng ký</span>':canRegister?`<button onclick="registerProgram('${encodeURIComponent(p.maBuoi)}')">Đăng ký</button>`:'<button disabled>Không thể đăng ký</button>'}</div></div>`;
+    return `<div class="program"><h3>${esc(p.tenBuoi)}</h3><p>📅 ${esc(p.ngay)}${p.gio?' · '+esc(p.gio):''}</p>${p.diaDiem?`<p>📍 ${esc(p.diaDiem)}</p>`:''}<p>${programStatus(p)}${p.gioiHan?' · Giới hạn '+esc(p.gioiHan):''}${p.doiTuong&&p.doiTuong!=='TẤT CẢ'?' · '+esc(p.doiTuong):''}</p>${p.ghiChu?`<p class="muted small">${esc(p.ghiChu)}</p>`:''}<div style="margin-top:10px">${mine?`<div class="row"><span class="badge ok" style="align-self:center">Đã đăng ký</span><button class="danger" onclick="cancelProgram('${encodeURIComponent(p.maBuoi)}')">Hủy đăng ký</button></div>`:canRegister?`<button onclick="registerProgram('${encodeURIComponent(p.maBuoi)}')">Đăng ký</button>`:'<button disabled>Không thể đăng ký</button>'}</div></div>`;
   }).join('');
 }
 let currentPrograms=[];let currentMine=[];
 async function loadPrograms(){const r=await jsonp({api:'registration_programs'});if(!r.success)throw new Error(r.message||'Không tải được chương trình.');currentPrograms=r.programs||[];renderPrograms(currentPrograms)}
-async function loadMine(){const r=await jsonp({api:'registration_mine',token});if(!r.success){if(r.type==='SESSION_EXPIRED'){logout();return}throw new Error(r.message||'Không tải được đăng ký.')}currentMine=r.registrations||[];document.getElementById('mine').innerHTML=currentMine.length?currentMine.map(x=>`<div class="program"><b>${esc(x.tenBuoi||x.maBuoi)}</b><p class="muted small">${esc(x.ngay||'')}${x.gio?' · '+esc(x.gio):''}</p><p>${x.trangThai==='ĐÃ ĐĂNG KÝ'?'<span class="ok">✓ Đã đăng ký</span>':'<span class="muted">Đã hủy</span>'}</p></div>`).join(''):'<p class="muted">Bạn chưa có đăng ký nào.</p>'}
-async function refreshAll(){try{await loadMine();await loadPrograms()}catch(e){show('programs',e.message,'danger')}}
+async function loadMine(){const r=await jsonp({api:'registration_mine',token});if(!r.success){if(r.type==='SESSION_EXPIRED'){logout();return}throw new Error(r.message||'Không tải được đăng ký.')}currentMine=r.registrations||[];document.getElementById('mine').innerHTML=currentMine.length?currentMine.map(x=>`<div class="program"><b>${esc(x.tenBuoi||x.maBuoi)}</b><p class="muted small">${esc(x.ngay||'')}${x.gio?' · '+esc(x.gio):''}</p><p>${x.trangThai==='ĐÃ ĐĂNG KÝ'?'<span class="ok">✓ Đã đăng ký</span>':'<span class="muted">Đã hủy</span>'}</p>${x.trangThai==='ĐÃ ĐĂNG KÝ'?`<button class="danger" onclick="cancelProgram('${encodeURIComponent(x.maBuoi)}')">Hủy đăng ký</button>`:''}</div>`).join(''):'<p class="muted">Bạn chưa có đăng ký nào.</p>'}
+async function refreshAll(){try{await loadMine();await loadPrograms()}catch(e){show('programs',e.message,'danger-text')}}
 async function registerProgram(encoded){const maBuoi=decodeURIComponent(encoded);if(!confirm('Xác nhận đăng ký chương trình này?'))return;try{const r=await jsonp({api:'registration_create',token,maBuoi});if(!r.success){alert(r.message||'Không đăng ký được.');return}alert(r.message||'Đăng ký thành công.');await refreshAll()}catch(e){alert(e.message)}}
-window.registerProgram=registerProgram;
+async function cancelProgram(encoded){const maBuoi=decodeURIComponent(encoded);if(!confirm('Bạn có chắc muốn hủy đăng ký chương trình này?'))return;try{const r=await jsonp({api:'registration_cancel',token,maBuoi});if(!r.success){alert(r.message||'Không thể hủy đăng ký.');return}alert(r.message||'Đã hủy đăng ký.');await refreshAll()}catch(e){alert(e.message)}}
+window.registerProgram=registerProgram;window.cancelProgram=cancelProgram;
 document.getElementById('loginBtn').onclick=login;document.getElementById('logoutBtn').onclick=logout;document.getElementById('refreshBtn').onclick=refreshAll;document.getElementById('last4').addEventListener('input',e=>e.target.value=e.target.value.replace(/\D/g,'').slice(0,4));
 if(token&&member){setLoggedIn();refreshAll().catch(()=>{})}
 </script>
