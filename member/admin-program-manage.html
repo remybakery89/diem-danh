@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Quản lý chương trình</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}*{box-sizing:border-box}body{margin:0}.wrap{max-width:900px;margin:auto;padding:18px 14px 42px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;margin:12px 0;box-shadow:0 4px 18px rgba(0,0,0,.05)}h1,h2,p{margin-top:0}.muted{color:#6b7280}.hidden{display:none!important}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-weight:650;margin-bottom:5px}input,select,textarea,button{width:100%;min-height:46px;border-radius:11px;font:inherit}input,select,textarea{border:1px solid #d1d5db;padding:10px 12px}textarea{min-height:90px;resize:vertical}button{border:0;background:#111827;color:#fff;font-weight:700;padding:0 15px;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top button{width:auto}.actions{display:flex;gap:10px}.actions button{flex:1}.notice{padding:11px;border-radius:11px;margin-top:10px}.error{background:#fee2e2;color:#991b1b}.success{background:#dcfce7;color:#166534}.hint{font-size:13px;color:#6b7280;margin-top:5px}@media(max-width:650px){.grid{grid-template-columns:1fr}.actions{flex-direction:column}}
+</style>
+</head>
+<body><div class="wrap">
+<div class="card" id="loginCard"><h1>Quản lý chương trình</h1><p class="muted">Admin tạo hoặc chỉnh sửa chương trình trong BUOI.</p><input id="password" type="password" placeholder="Mật khẩu Admin" autocomplete="current-password"><button id="loginBtn" style="margin-top:10px">Đăng nhập</button><div id="msg" class="notice hidden"></div></div>
+<div id="app" class="hidden">
+<div class="card"><div class="top"><div><h1 id="title">Tạo chương trình</h1><p class="muted">Dữ liệu được lưu trực tiếp vào sheet BUOI. Không xóa chương trình để bảo toàn lịch sử.</p></div><button class="secondary" onclick="back()">Quay lại</button></div></div>
+<div class="card"><form id="form">
+<div class="grid">
+<div><label>Tên chương trình *</label><input id="tenBuoi" required placeholder="Ví dụ: Thánh lễ Chúa Nhật"></div>
+<div><label>Địa điểm</label><input id="diaDiem" placeholder="Nhà thờ..."></div>
+<div><label>Ngày *</label><input id="ngay" type="date" required></div>
+<div><label>Giờ buổi *</label><input id="gio" type="time" required></div>
+<div><label>Mở đăng ký</label><input id="moDangKy" type="time"><div class="hint">Để trống nếu muốn giữ cách hoạt động cũ.</div></div>
+<div><label>Đóng đăng ký</label><input id="dongDangKy" type="time"></div>
+<div><label>Giới hạn số người</label><input id="gioiHan" inputmode="numeric" placeholder="Ví dụ: 80"></div>
+<div><label>Đối tượng</label><select id="doiTuong"><option value="TẤT CẢ">TẤT CẢ</option><option value="SOPRANO">SOPRANO</option><option value="ALTO">ALTO</option><option value="TENOR">TENOR</option><option value="BASS">BASS</option><option value="NỮ">NỮ</option><option value="NAM">NAM</option></select></div>
+</div>
+<div style="margin-top:12px"><label>Ghi chú</label><textarea id="ghiChu" placeholder="Thông tin thêm cho ca viên..."></textarea></div>
+<div class="actions" style="margin-top:14px"><button type="submit" id="saveBtn">Lưu chương trình</button><button type="button" class="secondary" onclick="resetForm()">Tạo mới</button></div>
+</form></div></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
+let password=sessionStorage.getItem('adminRegistrationPassword')||'';let editCode=new URLSearchParams(location.search).get('maBuoi')||'';
+function jsonp(params){return new Promise((resolve,reject)=>{const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');const q=new URLSearchParams({...params,callback:cb});const timer=setTimeout(()=>{cleanup();reject(new Error('Kết nối máy chủ quá lâu.'))},15000);function cleanup(){clearTimeout(timer);delete window[cb];script.remove()}window[cb]=d=>{cleanup();resolve(d)};script.onerror=()=>{cleanup();reject(new Error('Không kết nối được máy chủ.'))};script.src=API+'?'+q;document.body.appendChild(script)})}
+function msg(text,ok=false){const e=document.getElementById('msg');e.textContent=text;e.className='notice '+(ok?'success':'error');e.classList.remove('hidden')}
+function back(){location.href='admin-dashboard.html'}
+async function login(){const p=document.getElementById('password').value;if(!p)return msg('Vui lòng nhập mật khẩu.');document.getElementById('loginBtn').disabled=true;try{const r=await jsonp({api:'registration_admin',password:p});if(!r.success){msg(r.message||'Mật khẩu không đúng.');return}password=p;sessionStorage.setItem('adminRegistrationPassword',p);document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');if(editCode)await loadEdit()}catch(e){msg(e.message)}finally{document.getElementById('loginBtn').disabled=false}}
+async function loadEdit(){const r=await jsonp({api:'admin_program_get',password,maBuoi:editCode});if(!r.success){msg(r.message||'Không tải được chương trình.');return}const p=r.program;document.getElementById('title').textContent='Chỉnh sửa chương trình';['tenBuoi','diaDiem','ngay','gio','moDangKy','dongDangKy','gioiHan','ghiChu'].forEach(k=>document.getElementById(k).value=p[k]||'');document.getElementById('doiTuong').value=p.doiTuong||'TẤT CẢ'}
+async function save(e){e.preventDefault();const payload={maBuoi:editCode,tenBuoi:document.getElementById('tenBuoi').value.trim(),diaDiem:document.getElementById('diaDiem').value.trim(),ngay:document.getElementById('ngay').value,gio:document.getElementById('gio').value,moDangKy:document.getElementById('moDangKy').value,dongDangKy:document.getElementById('dongDangKy').value,gioiHan:document.getElementById('gioiHan').value.trim(),doiTuong:document.getElementById('doiTuong').value,ghiChu:document.getElementById('ghiChu').value.trim()};const b=document.getElementById('saveBtn');b.disabled=true;b.textContent='Đang lưu...';try{const r=await jsonp({api:'admin_program_save',password,payload:JSON.stringify(payload)});if(!r.success){msg(r.message||'Không lưu được.');return}msg(r.message||'Đã lưu.',true);editCode=r.maBuoi;history.replaceState({},'',location.pathname+'?maBuoi='+encodeURIComponent(editCode));document.getElementById('title').textContent='Chỉnh sửa chương trình';}catch(e){msg(e.message)}finally{b.disabled=false;b.textContent='Lưu chương trình'}}
+function resetForm(){document.getElementById('form').reset();editCode='';history.replaceState({},'',location.pathname);document.getElementById('title').textContent='Tạo chương trình'}
+document.getElementById('loginBtn').onclick=login;document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')login()};document.getElementById('form').onsubmit=save;if(password){document.getElementById('password').value=password;login()}
+</script></body></html>
