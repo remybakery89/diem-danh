@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Admin - Trung tâm chương trình</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:18px 14px 42px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;margin:12px 0;box-shadow:0 4px 18px rgba(0,0,0,.05)}
+h1,h2,h3,p{margin-top:0}.muted{color:#6b7280}.hidden{display:none!important}
+input,button{min-height:46px;border-radius:11px;font:inherit}input{width:100%;border:1px solid #d1d5db;padding:0 13px}button{border:0;background:#111827;color:#fff;font-weight:700;padding:0 15px;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}button:disabled{opacity:.55;cursor:not-allowed}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top button{width:auto}.toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#f9fafb;border-radius:14px;padding:14px;text-align:center}.num{font-size:25px;font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.program{border:1px solid #e5e7eb;border-radius:16px;padding:15px}.program h3{margin-bottom:6px}.program p{margin:4px 0}.program .meta{font-size:13px;color:#6b7280}.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0}.mini div{background:#f9fafb;border-radius:10px;padding:9px;text-align:center;font-size:12px}.mini b{display:block;font-size:18px;margin-bottom:2px}.ok{color:#15803d}.warn{color:#b45309}.danger{color:#b91c1c}.status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff}.actions{display:flex;gap:8px}.actions button{flex:1}
+.notice{padding:11px;border-radius:11px;margin-top:10px}.error{background:#fee2e2;color:#991b1b}.success{background:#dcfce7;color:#166534}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.toolbar{grid-template-columns:1fr}.mini{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="loginCard">
+    <h1>Trung tâm quản lý chương trình</h1>
+    <p class="muted">Theo dõi đăng ký và điểm danh theo từng chương trình.</p>
+    <input id="password" type="password" placeholder="Mật khẩu Admin" autocomplete="current-password">
+    <button id="loginBtn" style="width:100%;margin-top:10px">Đăng nhập</button>
+    <div id="msg" class="notice hidden"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <div class="top">
+        <div><h1>Chương trình</h1><p class="muted">Tổng quan nhanh. Chọn <b>Chi tiết</b> để xem danh sách đăng ký và đối chiếu điểm danh.</p></div>
+        <button class="secondary" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><div class="num" id="totalPrograms">0</div><div>Chương trình</div></div>
+        <div class="stat"><div class="num" id="totalRegistered">0</div><div>Đăng ký</div></div>
+        <div class="stat"><div class="num" id="totalPresent">0</div><div>Đã điểm danh</div></div>
+        <div class="stat"><div class="num" id="totalPending">0</div><div>Chưa điểm danh</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div><label>Tìm chương trình</label><input id="search" placeholder="Tên chương trình hoặc mã buổi..."></div>
+        <button id="refreshBtn">Làm mới</button>
+      </div>
+    </div>
+
+    <div id="programs" class="grid"></div>
+  </div>
+</div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
+let password=sessionStorage.getItem('adminRegistrationPassword')||'';
+let programs=[];
+function esc(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[c]))}
+function jsonp(params){return new Promise((resolve,reject)=>{const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');const q=new URLSearchParams({...params,callback:cb});const timer=setTimeout(()=>{cleanup();reject(new Error('Kết nối máy chủ quá lâu.'))},15000);function cleanup(){clearTimeout(timer);delete window[cb];script.remove()}window[cb]=d=>{cleanup();resolve(d)};script.onerror=()=>{cleanup();reject(new Error('Không kết nối được máy chủ.'))};script.src=API+'?'+q;document.body.appendChild(script)})}
+function msg(text,ok=false){const e=document.getElementById('msg');e.textContent=text;e.className='notice '+(ok?'success':'error');e.classList.remove('hidden')}
+async function login(){const p=document.getElementById('password').value;if(!p)return msg('Vui lòng nhập mật khẩu.');document.getElementById('loginBtn').disabled=true;try{const r=await jsonp({api:'registration_admin',password:p});if(!r.success){msg(r.message||'Mật khẩu không đúng.');return}password=p;sessionStorage.setItem('adminRegistrationPassword',p);document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await load()}catch(e){msg(e.message)}finally{document.getElementById('loginBtn').disabled=false}}
+async function load(){const r=await jsonp({api:'registration_programs'});if(!r.success)throw new Error(r.message||'Không tải được chương trình.');programs=r.programs||[];document.getElementById('totalPrograms').textContent=programs.length;await loadStats();render()}
+async function loadStats(){let reg=0,present=0,pending=0;for(const p of programs){try{const r=await jsonp({api:'registration_attendance_admin',password,maBuoi:p.maBuoi});if(r.success){reg+=Number(r.stats?.daDangKy||0);present+=Number(r.stats?.daDiemDanh||0);pending+=Number(r.stats?.chuaDiemDanh||0);p._stats=r.stats||{}}}catch(e){}}document.getElementById('totalRegistered').textContent=reg;document.getElementById('totalPresent').textContent=present;document.getElementById('totalPending').textContent=pending}
+function render(){const q=document.getElementById('search').value.trim().toLowerCase();const list=programs.filter(p=>!q||[p.maBuoi,p.tenBuoi,p.diaDiem,p.ngay].join(' ').toLowerCase().includes(q));const box=document.getElementById('programs');box.innerHTML=list.length?list.map(p=>{const s=p._stats||{};const status=p.trangThai==='ĐANG MỞ'?'<span class="status ok">ĐANG MỞ</span>':`<span class="status">${esc(p.trangThai)}</span>`;return `<div class="program"><h3>${esc(p.tenBuoi)}</h3><p>${status}</p><p class="meta">${esc(p.maBuoi)} · ${esc(p.ngay)}${p.gio?' · '+esc(p.gio):''}${p.diaDiem?' · '+esc(p.diaDiem):''}</p><div class="mini"><div><b>${s.daDangKy||0}</b>Đăng ký</div><div><b class="ok">${s.daDiemDanh||0}</b>Đã điểm danh</div><div><b class="warn">${s.chuaDiemDanh||0}</b>Chưa điểm danh</div><div><b class="danger">${s.daHuy||0}</b>Đã hủy</div></div><div class="actions"><button onclick="openDetail('${encodeURIComponent(p.maBuoi)}')">Chi tiết</button></div></div>`}).join(''):'<div class="card"><p class="muted">Không tìm thấy chương trình.</p></div>'}
+function openDetail(encoded){sessionStorage.setItem('adminSelectedProgram',decodeURIComponent(encoded));location.href='admin-registrations.html'}
+function logout(){sessionStorage.removeItem('adminRegistrationPassword');sessionStorage.removeItem('adminSelectedProgram');location.reload()}
+document.getElementById('loginBtn').onclick=login;document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')login()};document.getElementById('refreshBtn').onclick=load;document.getElementById('search').oninput=render;
+if(password){document.getElementById('password').value=password;login()}
+</script>
+</body>
+</html>
