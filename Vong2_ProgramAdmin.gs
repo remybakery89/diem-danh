@@ -111,10 +111,18 @@ function adminSaveProgram_(password, payload) {
     sheet.getRange(rowNumber, 3).setNumberFormat('HH:mm');
     sheet.getRange(rowNumber, 6, 1, 2).setNumberFormat('HH:mm');
 
+    // Chỉ thay đổi chế độ thủ công khi payload có gửi lên.
+    // Chương trình cũ không có chế độ -> giữ AUTO mặc định.
+    const requestedMode = String(payload.cheDoDangKy || '').trim().toUpperCase();
+    if (requestedMode === 'AUTO' || requestedMode === 'OPEN' || requestedMode === 'CLOSED') {
+      setRegistrationMode_(password, maBuoi, requestedMode);
+    }
+
     return {
       success: true,
       message: maBuoiInput ? 'Đã cập nhật chương trình.' : 'Đã tạo chương trình mới.',
-      maBuoi: maBuoi
+      maBuoi: maBuoi,
+      cheDoDangKy: getRegistrationMode_(maBuoi)
     };
   } finally {
     lock.releaseLock();
@@ -153,7 +161,8 @@ function adminGetProgram_(password, maBuoi) {
         dongDangKy: closeValue instanceof Date ? Utilities.formatDate(closeValue, TIMEZONE, 'HH:mm') : String(closeValue || ''),
         gioiHan: String(data[i][7] || ''),
         doiTuong: String(data[i][8] || ''),
-        ghiChu: String(data[i][9] || '')
+        ghiChu: String(data[i][9] || ''),
+        cheDoDangKy: getRegistrationMode_(code)
       }
     };
   }
