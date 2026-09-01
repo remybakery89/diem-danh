@@ -14,8 +14,18 @@
  * J Ghi chú
  *
  * Không xóa BUOI để bảo toàn lịch sử DANG_KY / Diem_Danh.
+ *
+ * VÒNG 3:
+ * - AUTO   : theo thời gian mở/đóng như trước.
+ * - OPEN   : Admin ép mở đăng ký.
+ * - CLOSED : Admin ép đóng đăng ký.
+ *
+ * Chế độ được lưu trong Script Properties, không thêm cột vào BUOI,
+ * nên không ảnh hưởng dữ liệu cũ.
  * ============================================================
  */
+
+const REGISTRATION_MODE_PREFIX = 'REG_MODE_';
 
 function adminListPrograms_(password) {
   const auth = verifyAdminPassword(password);
@@ -60,6 +70,11 @@ function adminSaveProgram_(password, payload) {
   }
   if (dongDangKy && !/^\d{2}:\d{2}$/.test(dongDangKy)) {
     return { success: false, type: 'INVALID_CLOSE_TIME', message: 'Giờ đóng đăng ký không hợp lệ.' };
+  }
+
+  const requestedMode = String(payload.cheDoDangKy || '').trim().toUpperCase();
+  if (requestedMode && ['AUTO', 'OPEN', 'CLOSED'].indexOf(requestedMode) < 0) {
+    return { success: false, type: 'INVALID_REGISTRATION_MODE', message: 'Chế độ đăng ký không hợp lệ.' };
   }
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -111,10 +126,7 @@ function adminSaveProgram_(password, payload) {
     sheet.getRange(rowNumber, 3).setNumberFormat('HH:mm');
     sheet.getRange(rowNumber, 6, 1, 2).setNumberFormat('HH:mm');
 
-    // Chỉ thay đổi chế độ thủ công khi payload có gửi lên.
-    // Chương trình cũ không có chế độ -> giữ AUTO mặc định.
-    const requestedMode = String(payload.cheDoDangKy || '').trim().toUpperCase();
-    if (requestedMode === 'AUTO' || requestedMode === 'OPEN' || requestedMode === 'CLOSED') {
+    if (requestedMode) {
       setRegistrationMode_(password, maBuoi, requestedMode);
     }
 
@@ -168,4 +180,73 @@ function adminGetProgram_(password, maBuoi) {
   }
 
   return { success: false, type: 'NOT_FOUND', message: 'Không tìm thấy chương trình.' };
+}
+
+/* ============================================================
+ * VÒNG 3 — CHẾ ĐỘ MỞ / ĐÓNG ĐĂNG KÝ
+ *
+ * Không thêm cột vào BUOI.
+ * Script Properties chỉ lưu override của từng chương trình.
+ * Không có property => AUTO, nên dữ liệu/chương trình cũ an toàn.
+ * ============================================================ */
+
+function getRegistrationModeKey_(maBuoi) {
+  return REGISTRATION_MODE_PREFIX + String(maBuoi || '').trim();
+}
+
+function getRegistrationMode_(maBuoi) {
+  const code = String(maBuoi || '').trim();
+  if (!code) return 'AUTO';
+
+  const mode = PropertiesService.getScriptProperties()
+    .getProperty(getRegistrationModeKey_(code));
+
+  if (mode === 'OPEN' || mode === 'CLOSED') {
+    return mode;
+  }
+
+  return 'AUTO';
+}
+
+function setRegistrationMode_(password, maBuoi, mode) {
+  const auth = verifyAdminPassword(password);
+  if (!auth.success) return auth;
+
+  const code = String(maBuoi || '').trim();
+  const normalized = String(mode || '').trim().toUpperCase();
+
+  if (!code) {
+    return { success: false, type: 'INVALID_INPUT', message: 'Thiếu mã buổi.' };
+  }
+
+  if (['AUTO', 'OPEN', 'CLOSED'].indexOf(normalized) < 0) {
+    return { success: false, type: 'INVALID_REGISTRATION_MODE', message: 'Chế độ đăng ký không hợp lệ.' };
+  }
+
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_BUOI);
+  if (!sheet) throw new Error('Không tìm thấy sheet BUOI.');
+
+  if (!getBuoiByMa_(sheet, code)) {
+    return { success: false, type: 'NOT_FOUND', message: 'Không tìm thấy chương trình.' };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const key = getRegistrationModeKey_(code);
+
+  if (normalized === 'AUTO') {
+    // AUTO là trạng thái mặc định: xóa override để chương trình quay về lịch.
+    props.deleteProperty(key);
+  } else {
+    props.setProperty(key, normalized);
+  }
+
+  return {
+    success: true,
+    maBuoi: code,
+    cheDoDangKy: getRegistrationMode_(code)
+  };
+}
+
+function adminSetRegistrationMode_(password, maBuoi, mode) {
+  return setRegistrationMode_(password, maBuoi, mode);
 }
