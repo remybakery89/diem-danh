@@ -28,7 +28,6 @@ function adminListPrograms_(password) {
 function adminSaveProgram_(password, payload) {
   const auth = verifyAdminPassword(password);
   if (!auth.success) return auth;
-
   if (!payload || typeof payload !== 'object') return { success: false, type: 'INVALID_DATA', message: 'Dữ liệu chương trình không hợp lệ.' };
 
   const tenBuoi = String(payload.tenBuoi || '').trim();
@@ -48,7 +47,7 @@ function adminSaveProgram_(password, payload) {
   if (hanChot && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(hanChot)) return { success: false, type: 'INVALID_DEADLINE', message: 'Hạn chót không hợp lệ.' };
 
   const requestedMode = String(payload.cheDoDangKy || '').trim().toUpperCase();
-  if (requestedMode && ['AUTO', 'OPEN', 'CLOSED'].indexOf(requestedMode) < 0) return { success: false, type: 'INVALID_REGISTRATION_MODE', message: 'Chế độ đăng ký không hợp lệ.' };
+  if (requestedMode && ['AUTO', 'CLOSED'].indexOf(requestedMode) < 0) return { success: false, type: 'INVALID_REGISTRATION_MODE', message: 'Chế độ đăng ký không hợp lệ.' };
 
   const phuongTien = String(payload.phuongTien || '').trim();
   if (phuongTien && ['KHÔNG ÁP DỤNG', 'XE CHUNG', 'XE RIÊNG'].indexOf(phuongTien.toUpperCase()) < 0) return { success: false, type: 'INVALID_TRANSPORT', message: 'Phương tiện không hợp lệ.' };
@@ -78,30 +77,13 @@ function adminSaveProgram_(password, payload) {
     }
 
     const oldClose = (maBuoiInput && rowNumber <= data.length) ? data[rowNumber - 1][6] : '';
-    const values = [[
-      maBuoi,
-      new Date(ngayText + 'T00:00:00'),
-      new Date('1899-12-30T' + gioText + ':00'),
-      tenBuoi,
-      String(payload.diaDiem || '').trim(),
-      moDangKy ? new Date('1899-12-30T' + moDangKy + ':00') : '',
-      oldClose,
-      gioiHan,
-      String(payload.doiTuong || '').trim(),
-      String(payload.ghiChu || '').trim(),
-      hanChot ? new Date(hanChot) : '',
-      phuongTien,
-      String(payload.diemDon || '').trim()
-    ]];
-
+    const values = [[maBuoi,new Date(ngayText + 'T00:00:00'),new Date('1899-12-30T' + gioText + ':00'),tenBuoi,String(payload.diaDiem || '').trim(),moDangKy ? new Date('1899-12-30T' + moDangKy + ':00') : '',oldClose,gioiHan,String(payload.doiTuong || '').trim(),String(payload.ghiChu || '').trim(),hanChot ? new Date(hanChot) : '',phuongTien,String(payload.diemDon || '').trim()]];
     sheet.getRange(rowNumber, 1, 1, 13).setValues(values);
     sheet.getRange(rowNumber, 2).setNumberFormat('dd/MM/yyyy');
     sheet.getRange(rowNumber, 3).setNumberFormat('HH:mm');
     sheet.getRange(rowNumber, 6).setNumberFormat('HH:mm');
     sheet.getRange(rowNumber, 11).setNumberFormat('dd/MM/yyyy HH:mm');
-
     if (requestedMode) setRegistrationMode_(password, maBuoi, requestedMode);
-
     return { success: true, message: maBuoiInput ? 'Đã cập nhật chương trình.' : 'Đã tạo chương trình mới.', maBuoi: maBuoi, cheDoDangKy: getRegistrationMode_(maBuoi) };
   } finally { lock.releaseLock(); }
 }
@@ -111,43 +93,18 @@ function adminGetProgram_(password, maBuoi) {
   if (!auth.success) return auth;
   const code = String(maBuoi || '').trim();
   if (!code) return { success: false, message: 'Thiếu mã buổi.' };
-
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_BUOI);
   if (!sheet) throw new Error('Không tìm thấy sheet BUOI.');
   const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
+  for (let i=1;i<data.length;i++) {
     if (String(data[i][0] || '').trim() !== code) continue;
-    const dateValue = data[i][1], timeValue = data[i][2], openValue = data[i][5], deadlineValue = data[i][10];
-    return { success: true, program: {
-      maBuoi: code,
-      ngay: dateValue instanceof Date ? Utilities.formatDate(dateValue, TIMEZONE, 'yyyy-MM-dd') : String(dateValue || ''),
-      gio: timeValue instanceof Date ? Utilities.formatDate(timeValue, TIMEZONE, 'HH:mm') : String(timeValue || ''),
-      tenBuoi: String(data[i][3] || ''), diaDiem: String(data[i][4] || ''),
-      moDangKy: openValue instanceof Date ? Utilities.formatDate(openValue, TIMEZONE, 'HH:mm') : String(openValue || ''),
-      hanChot: deadlineValue instanceof Date ? Utilities.formatDate(deadlineValue, TIMEZONE, "yyyy-MM-dd'T'HH:mm") : String(deadlineValue || ''),
-      gioiHan: String(data[i][7] || ''), doiTuong: String(data[i][8] || ''), ghiChu: String(data[i][9] || ''),
-      phuongTien: String(data[i][11] || ''), diemDon: String(data[i][12] || ''), cheDoDangKy: getRegistrationMode_(code)
-    }};
+    const dateValue=data[i][1], timeValue=data[i][2], openValue=data[i][5], deadlineValue=data[i][10];
+    return {success:true,program:{maBuoi:code,ngay:dateValue instanceof Date?Utilities.formatDate(dateValue,TIMEZONE,'yyyy-MM-dd'):String(dateValue||''),gio:timeValue instanceof Date?Utilities.formatDate(timeValue,TIMEZONE,'HH:mm'):String(timeValue||''),tenBuoi:String(data[i][3]||''),diaDiem:String(data[i][4]||''),moDangKy:openValue instanceof Date?Utilities.formatDate(openValue,TIMEZONE,'HH:mm'):String(openValue||''),hanChot:deadlineValue instanceof Date?Utilities.formatDate(deadlineValue,TIMEZONE,"yyyy-MM-dd'T'HH:mm"):String(deadlineValue||''),gioiHan:String(data[i][7]||''),doiTuong:String(data[i][8]||''),ghiChu:String(data[i][9]||''),phuongTien:String(data[i][11]||''),diemDon:String(data[i][12]||''),cheDoDangKy:getRegistrationMode_(code)}};
   }
-  return { success: false, type: 'NOT_FOUND', message: 'Không tìm thấy chương trình.' };
+  return {success:false,type:'NOT_FOUND',message:'Không tìm thấy chương trình.'};
 }
 
-function getRegistrationModeKey_(maBuoi) { return REGISTRATION_MODE_PREFIX + String(maBuoi || '').trim(); }
-function getRegistrationMode_(maBuoi) {
-  const mode = PropertiesService.getScriptProperties().getProperty(getRegistrationModeKey_(maBuoi));
-  return mode === 'OPEN' || mode === 'CLOSED' ? mode : 'AUTO';
-}
-function setRegistrationMode_(password, maBuoi, mode) {
-  const auth = verifyAdminPassword(password); if (!auth.success) return auth;
-  const code = String(maBuoi || '').trim(), normalized = String(mode || '').trim().toUpperCase();
-  if (!code) return { success:false, type:'INVALID_INPUT', message:'Thiếu mã buổi.' };
-  if (['AUTO','OPEN','CLOSED'].indexOf(normalized)<0) return { success:false, type:'INVALID_REGISTRATION_MODE', message:'Chế độ đăng ký không hợp lệ.' };
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_BUOI);
-  if (!sheet) throw new Error('Không tìm thấy sheet BUOI.');
-  if (!getBuoiByMa_(sheet, code)) return { success:false, type:'NOT_FOUND', message:'Không tìm thấy chương trình.' };
-  const props = PropertiesService.getScriptProperties(), key = getRegistrationModeKey_(code);
-  if (normalized === 'AUTO') props.deleteProperty(key); else props.setProperty(key, normalized);
-  return { success:true, maBuoi:code, cheDoDangKy:getRegistrationMode_(code) };
-}
-function adminSetRegistrationMode_(password, maBuoi, mode) { return setRegistrationMode_(password, maBuoi, mode); }
-""
+function getRegistrationModeKey_(maBuoi){return REGISTRATION_MODE_PREFIX+String(maBuoi||'').trim();}
+function getRegistrationMode_(maBuoi){const mode=PropertiesService.getScriptProperties().getProperty(getRegistrationModeKey_(maBuoi));return mode==='CLOSED'?'CLOSED':'AUTO';}
+function setRegistrationMode_(password,maBuoi,mode){const auth=verifyAdminPassword(password);if(!auth.success)return auth;const code=String(maBuoi||'').trim(),normalized=String(mode||'').trim().toUpperCase();if(!code)return{success:false,type:'INVALID_INPUT',message:'Thiếu mã buổi.'};if(['AUTO','CLOSED'].indexOf(normalized)<0)return{success:false,type:'INVALID_REGISTRATION_MODE',message:'Chế độ đăng ký không hợp lệ.'};const sheet=SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_BUOI);if(!sheet)throw new Error('Không tìm thấy sheet BUOI.');if(!getBuoiByMa_(sheet,code))return{success:false,type:'NOT_FOUND',message:'Không tìm thấy chương trình.'};const props=PropertiesService.getScriptProperties(),key=getRegistrationModeKey_(code);if(normalized==='AUTO')props.deleteProperty(key);else props.setProperty(key,normalized);return{success:true,maBuoi:code,cheDoDangKy:getRegistrationMode_(code)};}
+function adminSetRegistrationMode_(password,maBuoi,mode){return setRegistrationMode_(password,maBuoi,mode);}
