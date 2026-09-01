@@ -51,6 +51,8 @@ function adminSaveProgram_(password, payload) {
 
   const phuongTien = String(payload.phuongTien || '').trim();
   if (phuongTien && ['KHÔNG ÁP DỤNG', 'XE CHUNG', 'XE RIÊNG'].indexOf(phuongTien.toUpperCase()) < 0) return { success: false, type: 'INVALID_TRANSPORT', message: 'Phương tiện không hợp lệ.' };
+  const diemDon = String(payload.diemDon || '').trim();
+  if (phuongTien.toUpperCase() === 'XE CHUNG' && !diemDon) return { success: false, type: 'MISSING_PICKUP', message: 'Vui lòng nhập điểm đón cho xe chung.' };
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(SHEET_BUOI);
@@ -77,7 +79,7 @@ function adminSaveProgram_(password, payload) {
     }
 
     const oldClose = (maBuoiInput && rowNumber <= data.length) ? data[rowNumber - 1][6] : '';
-    const values = [[maBuoi,new Date(ngayText + 'T00:00:00'),new Date('1899-12-30T' + gioText + ':00'),tenBuoi,String(payload.diaDiem || '').trim(),moDangKy ? new Date('1899-12-30T' + moDangKy + ':00') : '',oldClose,gioiHan,String(payload.doiTuong || '').trim(),String(payload.ghiChu || '').trim(),hanChot ? new Date(hanChot) : '',phuongTien,String(payload.diemDon || '').trim()]];
+    const values = [[maBuoi,new Date(ngayText + 'T00:00:00'),new Date('1899-12-30T' + gioText + ':00'),tenBuoi,String(payload.diaDiem || '').trim(),moDangKy ? new Date('1899-12-30T' + moDangKy + ':00') : '',oldClose,gioiHan,String(payload.doiTuong || '').trim(),String(payload.ghiChu || '').trim(),hanChot ? new Date(hanChot) : '',phuongTien,diemDon]];
     sheet.getRange(rowNumber, 1, 1, 13).setValues(values);
     sheet.getRange(rowNumber, 2).setNumberFormat('dd/MM/yyyy');
     sheet.getRange(rowNumber, 3).setNumberFormat('HH:mm');
