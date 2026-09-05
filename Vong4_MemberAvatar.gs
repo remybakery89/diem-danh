@@ -7,12 +7,14 @@
 const AVATAR_FOLDER_ID = '1tZNqbRhewUACC5p5SWbnmSAkMdoIk_vX';
 const AVATAR_MAX_BASE64 = 700 * 1024;
 
-// Chạy hàm này 1 lần trong Apps Script để cấp quyền Drive cho project.
-// Không đặt dấu _ cuối tên để Apps Script hiện hàm trong danh sách Run.
+// Chạy hàm này 1 lần trong Apps Script để kiểm tra đúng quyền TẠO FILE trong Drive.
 function authorizeAvatarDrive() {
   const folder = DriveApp.getFolderById(AVATAR_FOLDER_ID);
-  folder.getName();
-  return 'Đã cấp quyền Drive cho Avatar.';
+  const testBlob = Utilities.newBlob('avatar authorization test', 'text/plain', '.avatar_permission_test.txt');
+  const testFile = folder.createFile(testBlob);
+  const testId = testFile.getId();
+  testFile.setTrashed(true);
+  return 'Đã kiểm tra quyền Drive: có thể tạo file. Test file: ' + testId;
 }
 
 function doPost(e) {
@@ -27,7 +29,10 @@ function doPost(e) {
       result = { success: false, message: 'API không hợp lệ.' };
     }
   } catch (err) {
-    result = { success: false, message: String(err && err.message || err) };
+    result = {
+      success: false,
+      message: String(err && err.message || err)
+    };
   }
 
   const payload = JSON.stringify({
@@ -52,21 +57,28 @@ function uploadMemberAvatar_(token, imageData) {
 
   if (!token) return { success: false, message: 'Phiên đăng nhập không hợp lệ.' };
   if (!imageData) return { success: false, message: 'Chưa có ảnh.' };
-  if (imageData.length > AVATAR_MAX_BASE64) return { success: false, message: 'Ảnh sau khi nén vẫn quá lớn.' };
+  if (imageData.length > AVATAR_MAX_BASE64) {
+    return { success: false, message: 'Ảnh sau khi nén vẫn quá lớn.' };
+  }
 
   const member = getMemberFromRegistrationToken_(token);
-  if (!member || !member.ma) return { success: false, message: 'Không xác định được ca viên.' };
+  if (!member || !member.ma) {
+    return { success: false, message: 'Không xác định được ca viên.' };
+  }
 
   const m = imageData.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!m) return { success: false, message: 'Định dạng ảnh không hợp lệ.' };
 
   const bytes = Utilities.base64Decode(m[2]);
   if (!bytes || !bytes.length) return { success: false, message: 'Ảnh rỗng.' };
-  if (bytes.length > 520 * 1024) return { success: false, message: 'Ảnh sau khi nén vượt quá giới hạn 520 KB.' };
+  if (bytes.length > 520 * 1024) {
+    return { success: false, message: 'Ảnh sau khi nén vượt quá giới hạn 520 KB.' };
+  }
 
   const folder = DriveApp.getFolderById(AVATAR_FOLDER_ID);
   const fileName = String(member.ma) + '_avatar.jpg';
-  const file = folder.createFile(Utilities.newBlob(bytes, 'image/jpeg', fileName));
+  const blob = Utilities.newBlob(bytes, 'image/jpeg', fileName);
+  const file = folder.createFile(blob);
 
   try {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -113,6 +125,7 @@ function uploadMemberAvatar_(token, imageData) {
   const oldUrl = String(sh.getRange(row, avatarCol + 1).getValue() || '').trim();
   const avatarUrl = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(file.getId()) + '&sz=w400';
   sh.getRange(row, avatarCol + 1).setValue(avatarUrl);
+
   trashOldAvatarFile_(oldUrl, file.getId());
 
   return { success: true, message: 'Đã cập nhật ảnh đại diện.', avatar: avatarUrl };
@@ -144,5 +157,7 @@ function trashOldAvatarFile_(oldUrl, newFileId) {
       }
     }
     if (inAvatarFolder) oldFile.setTrashed(true);
-  } catch (err) {}
+  } catch (err) {
+    // Không để lỗi dọn ảnh cũ làm thất bại việc cập nhật avatar mới.
+  }
 }
