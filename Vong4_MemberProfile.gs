@@ -105,7 +105,8 @@ function registrationMemberProfile_(token) {
         'ngay tham gia'
       ),
       vaiTro: readHeader('vai trò', 'vai tro') || 'Ca viên',
-      avatar: readHeader('avatar', 'ảnh avatar', 'anh avatar')
+      avatar: readHeader('avatar', 'ảnh avatar', 'anh avatar'),
+      thamGia: getMemberParticipation_(code)
     }
   };
 }
