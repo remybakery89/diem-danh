@@ -25,16 +25,22 @@ function doPost(e) {
     };
   }
 
-  // ALLOWALL là bắt buộc vì response nằm trong hidden iframe
-  // trên GitHub Pages và cần gửi kết quả về parent bằng postMessage.
-  return HtmlService.createHtmlOutput(
-    '<script>window.parent.postMessage(' + JSON.stringify({
-      type: 'member_avatar_upload',
-      success: !!result.success,
-      message: result.message || '',
-      avatar: result.avatar || ''
-    }) + ', "*");</script>'
-  ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const payload = JSON.stringify({
+    type: 'member_avatar_upload',
+    success: !!result.success,
+    message: result.message || '',
+    avatar: result.avatar || ''
+  }).replace(/</g, '\\u003c');
+
+  // Apps Script HtmlService có thêm một lớp iframe sandbox.
+  // Phải postMessage tới window.top để GitHub Pages nhận được response.
+  return HtmlService
+    .createHtmlOutput(
+      '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+      '<script>window.top.postMessage(' + payload + ', "*");</script>' +
+      '</body></html>'
+    )
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function uploadMemberAvatar_(token, imageData) {
@@ -97,7 +103,7 @@ function uploadMemberAvatar_(token, imageData) {
 
   let row = -1;
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][maCol]).trim() === String(member.ma).trim()) {
+    if (String(values[i][maCol]).trim().toUpperCase() === String(member.ma).trim().toUpperCase()) {
       row = i + 1;
       break;
     }
@@ -112,7 +118,6 @@ function uploadMemberAvatar_(token, imageData) {
   const avatarUrl = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(file.getId()) + '&sz=w400';
   sh.getRange(row, avatarCol + 1).setValue(avatarUrl);
 
-  // Chỉ dọn file cũ nếu nó nằm đúng trong thư mục avatar của hệ thống.
   trashOldAvatarFile_(oldUrl, file.getId());
 
   return { success: true, message: 'Đã cập nhật ảnh đại diện.', avatar: avatarUrl };
