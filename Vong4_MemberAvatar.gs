@@ -7,6 +7,13 @@
 const AVATAR_FOLDER_ID = '1tZNqbRhewUACC5p5SWbnmSAkMdoIk_vX';
 const AVATAR_MAX_BASE64 = 700 * 1024;
 
+// Chạy hàm này 1 lần trong Apps Script để cấp quyền Drive cho project.
+function authorizeAvatarDrive_() {
+  const folder = DriveApp.getFolderById(AVATAR_FOLDER_ID);
+  folder.getName();
+  return 'Đã cấp quyền Drive cho Avatar.';
+}
+
 function doPost(e) {
   let result;
   try {
@@ -32,8 +39,6 @@ function doPost(e) {
     avatar: result.avatar || ''
   }).replace(/</g, '\\u003c');
 
-  // Apps Script HtmlService có thêm một lớp iframe sandbox.
-  // Phải postMessage tới window.top để GitHub Pages nhận được response.
   return HtmlService
     .createHtmlOutput(
       '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
