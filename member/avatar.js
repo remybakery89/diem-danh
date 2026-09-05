@@ -1,11 +1,12 @@
 /* VÒNG 4 — AVATAR
- * Upload avatar qua Apps Script bằng POST, không đi qua JSONP.
- * Backend endpoint: member_avatar_upload
+ * Upload avatar qua Apps Script bằng POST + hidden iframe.
+ * Tránh CORS của fetch khi gọi Apps Script từ GitHub Pages.
  */
 (function () {
   const AVATAR_API = 'https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
   const MAX_BYTES = 500 * 1024;
   const MAX_SIDE = 800;
+  const FRAME_ID = 'memberAvatarUploadFrame';
 
   function avatarDataUrl(file) {
     return new Promise((resolve, reject) => {
@@ -31,13 +32,59 @@
     });
   }
 
+  function ensureFrame() {
+    let frame = document.getElementById(FRAME_ID);
+    if (frame) return frame;
+    frame = document.createElement('iframe');
+    frame.id = FRAME_ID;
+    frame.name = FRAME_ID;
+    frame.style.display = 'none';
+    document.body.appendChild(frame);
+    return frame;
+  }
+
   function postAvatar(token, imageData) {
     return new Promise((resolve, reject) => {
-      const body = new URLSearchParams({ api: 'member_avatar_upload', token: token, image: imageData });
-      fetch(AVATAR_API, { method: 'POST', body: body })
-        .then(r => r.json())
-        .then(resolve)
-        .catch(() => reject(new Error('Không kết nối được máy chủ.')));
+      const frame = ensureFrame();
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = AVATAR_API;
+      form.target = FRAME_ID;
+      form.style.display = 'none';
+
+      const add = (name, value) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      };
+      add('api', 'member_avatar_upload');
+      add('token', token);
+      add('image', imageData);
+      document.body.appendChild(form);
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Máy chủ phản hồi quá lâu.'));
+      }, 30000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        window.removeEventListener('message', onMessage);
+        form.remove();
+      }
+
+      function onMessage(event) {
+        const d = event.data || {};
+        if (d.type !== 'member_avatar_upload') return;
+        cleanup();
+        resolve(d);
+      }
+
+      window.addEventListener('message', onMessage);
+      frame.onload = function () {};
+      form.submit();
     });
   }
 
@@ -48,23 +95,35 @@
     area.style.marginTop = '12px';
     area.innerHTML = '<input id="avatarUploadInput" type="file" accept="image/*" hidden><button type="button" class="secondary" id="avatarUploadBtn">Đổi ảnh đại diện</button><div id="avatarUploadMsg" class="notice hidden"></div>';
     box.appendChild(area);
+
     const input = document.getElementById('avatarUploadInput');
     const btn = document.getElementById('avatarUploadBtn');
     const msg = document.getElementById('avatarUploadMsg');
+
     btn.onclick = () => input.click();
     input.onchange = async () => {
       if (!input.files[0]) return;
-      btn.disabled = true; btn.textContent = 'Đang tải ảnh...'; msg.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Đang tải ảnh...';
+      msg.classList.add('hidden');
       try {
         const data = await avatarDataUrl(input.files[0]);
-        const r = await postAvatar(sessionStorage.getItem('memberRegistrationToken') || '', data);
+        const token = sessionStorage.getItem('memberRegistrationToken') || '';
+        const r = await postAvatar(token, data);
         if (!r.success) throw new Error(r.message || 'Không lưu được avatar.');
         msg.textContent = 'Đã cập nhật ảnh đại diện.';
-        msg.className = 'notice ok'; msg.classList.remove('hidden');
+        msg.className = 'notice ok';
+        msg.classList.remove('hidden');
         if (typeof loadProfile === 'function') await loadProfile();
       } catch (e) {
-        msg.textContent = e.message; msg.className = 'notice danger-text'; msg.classList.remove('hidden');
-      } finally { btn.disabled = false; btn.textContent = 'Đổi ảnh đại diện'; input.value = ''; }
+        msg.textContent = e.message || 'Không lưu được avatar.';
+        msg.className = 'notice danger-text';
+        msg.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Đổi ảnh đại diện';
+        input.value = '';
+      }
     };
   };
 })();
