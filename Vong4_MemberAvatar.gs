@@ -8,36 +8,33 @@ const AVATAR_FOLDER_ID = '1tZNqbRhewUACC5p5SWbnmSAkMdoIk_vX';
 const AVATAR_MAX_BASE64 = 700 * 1024;
 
 function doPost(e) {
+  let result;
   try {
     const p = (e && e.parameter) || {};
     const api = String(p.api || '').trim();
 
     if (api === 'member_avatar_upload') {
-      const result = uploadMemberAvatar_(p.token, p.image);
-      return HtmlService.createHtmlOutput(
-        '<script>window.parent.postMessage(' + JSON.stringify({
-          type: 'member_avatar_upload',
-          success: !!result.success,
-          message: result.message || '',
-          avatar: result.avatar || ''
-        }) + ', "*");</script>'
-      );
+      result = uploadMemberAvatar_(p.token, p.image);
+    } else {
+      result = { success: false, message: 'API không hợp lệ.' };
     }
-
-    return HtmlService.createHtmlOutput(
-      '<script>window.parent.postMessage(' + JSON.stringify({
-        type: 'member_avatar_upload', success: false, message: 'API không hợp lệ.'
-      }) + ', "*");</script>'
-    );
   } catch (err) {
-    return HtmlService.createHtmlOutput(
-      '<script>window.parent.postMessage(' + JSON.stringify({
-        type: 'member_avatar_upload',
-        success: false,
-        message: String(err && err.message || err)
-      }) + ', "*");</script>'
-    );
+    result = {
+      success: false,
+      message: String(err && err.message || err)
+    };
   }
+
+  // ALLOWALL là bắt buộc vì response nằm trong hidden iframe
+  // trên GitHub Pages và cần gửi kết quả về parent bằng postMessage.
+  return HtmlService.createHtmlOutput(
+    '<script>window.parent.postMessage(' + JSON.stringify({
+      type: 'member_avatar_upload',
+      success: !!result.success,
+      message: result.message || '',
+      avatar: result.avatar || ''
+    }) + ', "*");</script>'
+  ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function uploadMemberAvatar_(token, imageData) {
@@ -90,8 +87,8 @@ function uploadMemberAvatar_(token, imageData) {
   }
 
   const headers = values[0].map(function (v) { return String(v).trim().toLowerCase(); });
-  const maCol = findHeaderIndex_(headers, ['mã ca viên', 'ma ca vien']);
-  const avatarCol = findHeaderIndex_(headers, ['avatar', 'ảnh đại diện', 'anh dai dien']);
+  const maCol = findAvatarHeaderIndex_(headers, ['mã ca viên', 'ma ca vien']);
+  const avatarCol = findAvatarHeaderIndex_(headers, ['avatar', 'ảnh đại diện', 'anh dai dien']);
 
   if (maCol < 0 || avatarCol < 0) {
     file.setTrashed(true);
@@ -115,13 +112,13 @@ function uploadMemberAvatar_(token, imageData) {
   const avatarUrl = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(file.getId()) + '&sz=w400';
   sh.getRange(row, avatarCol + 1).setValue(avatarUrl);
 
-  // Dọn avatar cũ do hệ thống tạo, nếu xác định được file ID từ URL.
+  // Chỉ dọn file cũ nếu nó nằm đúng trong thư mục avatar của hệ thống.
   trashOldAvatarFile_(oldUrl, file.getId());
 
   return { success: true, message: 'Đã cập nhật ảnh đại diện.', avatar: avatarUrl };
 }
 
-function findHeaderIndex_(headers, candidates) {
+function findAvatarHeaderIndex_(headers, candidates) {
   for (let i = 0; i < candidates.length; i++) {
     const idx = headers.indexOf(String(candidates[i]).toLowerCase());
     if (idx >= 0) return idx;
