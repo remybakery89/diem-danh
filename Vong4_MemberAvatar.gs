@@ -1,13 +1,16 @@
 /* VÒNG 4 — AVATAR
- * Nhận ảnh avatar từ member/avatar.js bằng POST + hidden iframe.
- * Không lưu ảnh vào Sheet; chỉ lưu URL ở cột Avatar (N) của Trang tính1.
+ * Upload avatar vào thư mục Drive đã chỉ định.
+ * Sheet chỉ lưu URL ở cột Avatar (N) của Trang tính1.
  * Folder Drive: 1tZNqbRhewUACC5p5SWbnmSAkMdoIk_vX
+ *
+ * LƯU Ý: Không gọi file.setSharing() ở đây.
+ * Việc chia sẻ được đặt ở cấp thư mục Drive để tránh lỗi quyền Sharing của project.
  */
 
 const AVATAR_FOLDER_ID = '1tZNqbRhewUACC5p5SWbnmSAkMdoIk_vX';
 const AVATAR_MAX_BASE64 = 700 * 1024;
 
-// Chạy hàm này 1 lần trong Apps Script để kiểm tra đúng quyền TẠO FILE trong Drive.
+// Chạy 1 lần trong Apps Script để xác nhận project có quyền tạo file.
 function authorizeAvatarDrive() {
   const folder = DriveApp.getFolderById(AVATAR_FOLDER_ID);
   const testBlob = Utilities.newBlob('avatar authorization test', 'text/plain', '.avatar_permission_test.txt');
@@ -29,10 +32,7 @@ function doPost(e) {
       result = { success: false, message: 'API không hợp lệ.' };
     }
   } catch (err) {
-    result = {
-      success: false,
-      message: String(err && err.message || err)
-    };
+    result = { success: false, message: String(err && err.message || err) };
   }
 
   const payload = JSON.stringify({
@@ -57,36 +57,24 @@ function uploadMemberAvatar_(token, imageData) {
 
   if (!token) return { success: false, message: 'Phiên đăng nhập không hợp lệ.' };
   if (!imageData) return { success: false, message: 'Chưa có ảnh.' };
-  if (imageData.length > AVATAR_MAX_BASE64) {
-    return { success: false, message: 'Ảnh sau khi nén vẫn quá lớn.' };
-  }
+  if (imageData.length > AVATAR_MAX_BASE64) return { success: false, message: 'Ảnh sau khi nén vẫn quá lớn.' };
 
   const member = getMemberFromRegistrationToken_(token);
-  if (!member || !member.ma) {
-    return { success: false, message: 'Không xác định được ca viên.' };
-  }
+  if (!member || !member.ma) return { success: false, message: 'Không xác định được ca viên.' };
 
   const m = imageData.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!m) return { success: false, message: 'Định dạng ảnh không hợp lệ.' };
 
   const bytes = Utilities.base64Decode(m[2]);
   if (!bytes || !bytes.length) return { success: false, message: 'Ảnh rỗng.' };
-  if (bytes.length > 520 * 1024) {
-    return { success: false, message: 'Ảnh sau khi nén vượt quá giới hạn 520 KB.' };
-  }
+  if (bytes.length > 520 * 1024) return { success: false, message: 'Ảnh sau khi nén vượt quá giới hạn 520 KB.' };
 
   const folder = DriveApp.getFolderById(AVATAR_FOLDER_ID);
   const fileName = String(member.ma) + '_avatar.jpg';
   const blob = Utilities.newBlob(bytes, 'image/jpeg', fileName);
   const file = folder.createFile(blob);
 
-  try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (sharingErr) {
-    file.setTrashed(true);
-    return { success: false, message: 'Không thể cấp quyền xem ảnh trên Drive.' };
-  }
-
+  // Không setSharing ở cấp file. Quyền xem phải được cấu hình ở cấp folder.
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sh = ss.getSheetByName(SHEET_CA_VIEN);
   if (!sh) {
@@ -158,6 +146,6 @@ function trashOldAvatarFile_(oldUrl, newFileId) {
     }
     if (inAvatarFolder) oldFile.setTrashed(true);
   } catch (err) {
-    // Không để lỗi dọn ảnh cũ làm thất bại việc cập nhật avatar mới.
+    // Không để lỗi dọn ảnh cũ làm thất bại avatar mới.
   }
 }
