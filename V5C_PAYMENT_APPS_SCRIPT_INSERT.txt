@@ -1,0 +1,13 @@
+THÊM CÁC ROUTE NÀY VÀO doGet(e), sau registration_v5_approve và trước registration_cancel:
+
+} else if (api === 'registration_v5_payment_mine') {
+  result = v5cGetMyPayments_(e.parameter.token);
+
+} else if (api === 'registration_v5_payment_admin') {
+  result = v5cGetAdminPayment_(e.parameter.password, e.parameter.maBuoi);
+
+} else if (api === 'registration_v5_payment_confirm') {
+  result = v5cConfirmPayment_(e.parameter.password, e.parameter.maBuoi, e.parameter.ma, e.parameter.soTienXacNhan);
+
+} else if (api === 'registration_v5_payment_export') {
+  result = v5cExportPaymentList_(e.parameter.password, e.parameter.maBuoi, e.parameter.filter);
