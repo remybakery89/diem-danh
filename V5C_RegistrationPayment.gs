@@ -60,6 +60,7 @@ function v5cUploadPayment_(token,maBuoi,imageData) {
   if(!member) return {success:false,type:'SESSION_EXPIRED',message:'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'};
   maBuoi=String(maBuoi||'').trim(); imageData=String(imageData||'').trim();
   if(!maBuoi||!imageData) return {success:false,type:'INVALID_INPUT',message:'Thiếu chương trình hoặc ảnh giao dịch.'};
+  if(v5cIsPaymentRequired_(maBuoi)!=='CÓ') return {success:false,type:'PAYMENT_NOT_REQUIRED',message:'Chương trình này không yêu cầu thanh toán.'};
   const ctx=v5cGetPaymentContext_(maBuoi,member.ma);
   if(!ctx.rowNumber) return {success:false,type:'NOT_REGISTERED',message:'Bạn chưa có đăng ký chương trình này.'};
   const status=String(ctx.row[8]||'').trim().toUpperCase();
@@ -94,8 +95,11 @@ function v5cGetMyPayments_(token){
     if(normalizeMemberCode_(rows[i][2])!==target)continue;
     const status=String(rows[i][8]||'').trim();
     if(status==='ĐÃ HỦY')continue;
-    const maBuoi=String(rows[i][1]||'').trim(); const info=v5cProgramInfo_(maBuoi);
-    result.push({maBuoi,maDangKy:String(rows[i][0]||'').trim(),tenBuoi:info.tenBuoi,ngay:info.ngay,gio:info.gio,trangThai:status,payment:v5cPaymentData_(rows[i])});
+    const maBuoi=String(rows[i][1]||'').trim();
+    const yeuCauThanhToan=v5cIsPaymentRequired_(maBuoi);
+    if(yeuCauThanhToan!=='CÓ')continue;
+    const info=v5cProgramInfo_(maBuoi);
+    result.push({maBuoi,maDangKy:String(rows[i][0]||'').trim(),tenBuoi:info.tenBuoi,ngay:info.ngay,gio:info.gio,trangThai:status,yeuCauThanhToan,payment:v5cPaymentData_(rows[i])});
   }
   return {success:true,registrations:result};
 }
@@ -107,19 +111,21 @@ function v5cGetMyPayment_(token,maBuoi){
 
 function v5cGetAdminPayment_(password,maBuoi){
   const auth=verifyAdminPassword(password); if(!auth.success)return auth;
+  const required=v5cIsPaymentRequired_(maBuoi);
   v5cEnsurePaymentStructure_(); const sh=SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_DANG_KY); const rows=sh.getDataRange().getDisplayValues(); const result=[];
-  for(let i=1;i<rows.length;i++) if(String(rows[i][1]||'').trim()===String(maBuoi||'').trim()) result.push({rowNumber:i+1,maDangKy:String(rows[i][0]||'').trim(),maBuoi:String(rows[i][1]||'').trim(),ma:String(rows[i][2]||'').trim(),hoTen:String(rows[i][3]||'').trim(),be:String(rows[i][4]||'').trim(),trangThai:String(rows[i][8]||'').trim(),trangThaiYeuCau:String(rows[i][9]||'').trim(),payment:v5cPaymentData_(rows[i])});
-  return {success:true,registrations:result};
+  for(let i=1;i<rows.length;i++) if(String(rows[i][1]||'').trim()===String(maBuoi||'').trim()) result.push({rowNumber:i+1,maDangKy:String(rows[i][0]||'').trim(),maBuoi:String(rows[i][1]||'').trim(),ma:String(rows[i][2]||'').trim(),hoTen:String(rows[i][3]||'').trim(),be:String(rows[i][4]||'').trim(),trangThai:String(rows[i][8]||'').trim(),trangThaiYeuCau:String(rows[i][9]||'').trim(),yeuCauThanhToan:required,payment:v5cPaymentData_(rows[i])});
+  return {success:true,yeuCauThanhToan:required,registrations:result};
 }
 
 function v5cConfirmPayment_(password,maBuoi,ma,amount){
   const auth=verifyAdminPassword(password); if(!auth.success)return auth;
+  if(v5cIsPaymentRequired_(maBuoi)!=='CÓ')return{success:false,type:'PAYMENT_NOT_REQUIRED',message:'Chương trình này không yêu cầu thanh toán.'};
   amount=String(amount??'').trim(); if(!amount)return {success:false,type:'INVALID_AMOUNT',message:'Vui lòng nhập số tiền xác nhận.'};
-  if(!/^\d+(?:[.,]\d{1,2})?$/.test(amount))return {success:false,type:'INVALID_AMOUNT',message:'Số tiền xác nhận không hợp lệ.'};
+  if(!/^\d+(?:[.,]\d{1,2})?$/.test(amount))return{success:false,type:'INVALID_AMOUNT',message:'Số tiền xác nhận không hợp lệ.'};
   const lock=LockService.getScriptLock(); lock.waitLock(15000);
   try{
-    const ctx=v5cGetPaymentContext_(maBuoi,ma); if(!ctx.rowNumber)return {success:false,type:'NOT_FOUND',message:'Không tìm thấy đăng ký.'};
-    if(!String(ctx.row[15]||'').trim())return {success:false,type:'NO_IMAGE',message:'Ca viên chưa gửi ảnh giao dịch.'};
+    const ctx=v5cGetPaymentContext_(maBuoi,ma); if(!ctx.rowNumber)return{success:false,type:'NOT_FOUND',message:'Không tìm thấy đăng ký.'};
+    if(!String(ctx.row[15]||'').trim())return{success:false,type:'NO_IMAGE',message:'Ca viên chưa gửi ảnh giao dịch.'};
     const now=Utilities.formatDate(new Date(),TIMEZONE,'dd/MM/yyyy HH:mm:ss');
     ctx.sheet.getRange(ctx.rowNumber,17).setValue(amount); ctx.sheet.getRange(ctx.rowNumber,18).setValue('ĐÃ XÁC NHẬN'); ctx.sheet.getRange(ctx.rowNumber,19).setValue(now); ctx.sheet.getRange(ctx.rowNumber,20).setValue('ADMIN');
     return {success:true,message:'Đã xác nhận thanh toán.',payment:v5cPaymentData_(ctx.sheet.getRange(ctx.rowNumber,16,1,5).getDisplayValues()[0])};
