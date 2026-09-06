@@ -1,5 +1,5 @@
 /* ============================================================
- * VÒNG 5 — GIAO DIỆN ĐĂNG KÝ
+ * VÒNG 5B — GIAO DIỆN ĐĂNG KÝ & LỊCH SỬ
  * ============================================================ */
 (function () {
   var v5Mine = [];
@@ -46,6 +46,19 @@
     return html;
   }
 
+  function renderHistory(history) {
+    if (!history || !history.length) return '<p class="muted small">Chưa có lịch sử thay đổi.</p>';
+    return '<div class="v5-history">' + history.slice().reverse().map(function (h) {
+      var title = h.loai || 'Cập nhật';
+      var status = h.trangThaiMoi || h.trangThaiYeuCau || '';
+      return '<div style="padding:9px 0;border-top:1px solid #eee">' +
+        '<b>' + escV5(title) + '</b>' +
+        (status ? ' · <span class="status ' + statusClass(status) + '">' + escV5(status) + '</span>' : '') +
+        '<div class="muted small">' + escV5(h.thoiGian || '') + (h.lyDo ? ' · Lý do: ' + escV5(h.lyDo) : '') + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
   function renderProgramsV5(list) {
     var box = document.getElementById('programs');
     if (!box) return;
@@ -84,21 +97,32 @@
         status === 'ĐI' ? '<span class="ok">✓ ĐI</span>' :
         status === 'KHÔNG ĐI' ? '<span class="danger-text">✕ KHÔNG ĐI</span>' :
         status === 'DỰ BỊ' ? '<span class="warn">◐ DỰ BỊ</span>' : '<span class="muted">Đã hủy</span>';
-      var request = x.trangThaiYeuCau ? '<p class="muted small">Yêu cầu: ' + escV5(x.trangThaiYeuCau) + '</p>' : '';
+      var request = x.trangThaiYeuCau ? '<p class="muted small">Yêu cầu đang chờ: ' + escV5(x.trangThaiYeuCau) + '</p>' : '';
+      var updated = x.thoiGianCapNhat ? '<p class="muted small">Cập nhật: ' + escV5(x.thoiGianCapNhat) + '</p>' : '';
       var cancel = status !== 'ĐÃ HỦY' && status !== 'CHỜ DUYỆT' ? '<button class="danger" onclick="v5CancelRegistration(\'' + encodeURIComponent(x.maBuoi) + '\')">Hủy đăng ký</button>' : '';
-      return '<div class="program"><b>' + escV5(x.tenBuoi || x.maBuoi) + '</b><p class="muted small">' + escV5(x.ngay || '') + (x.gio ? ' · ' + escV5(x.gio) : '') + '</p><p>' + text + '</p>' + request + cancel + '</div>';
+      return '<div class="program"><b>' + escV5(x.tenBuoi || x.maBuoi) + '</b><p class="muted small">' + escV5(x.ngay || '') + (x.gio ? ' · ' + escV5(x.gio) : '') + '</p><p>' + text + '</p>' + request + updated +
+        '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">Xem lịch sử</summary>' + renderHistory(x.lichSu) + '</details>' +
+        (cancel ? '<div style="margin-top:10px">' + cancel + '</div>' : '') + '</div>';
     }).join('') : '<p class="muted">Bạn chưa có đăng ký nào.</p>';
   }
 
   async function submitStatus(encodedMaBuoi, encodedStatus) {
     var maBuoi = decodeURIComponent(encodedMaBuoi), status = decodeURIComponent(encodedStatus);
     var mine = findMine(maBuoi), isChange = !!mine && mine.trangThai !== status, reason = '';
-    if (isChange || !mine) {
-      reason = prompt(isChange ? 'Bạn đang thay đổi trạng thái. Vui lòng nhập lý do:' : 'Nếu đăng ký sau hạn chót, vui lòng nhập lý do (có thể bỏ trống nếu chưa tới hạn):','');
+    if (isChange) {
+      reason = prompt('Bạn đang thay đổi trạng thái. Vui lòng nhập lý do:', '');
       if (reason === null) return;
+      if (!reason.trim()) { alert('Vui lòng nhập lý do thay đổi.'); return; }
     }
     try {
       var r = await window.jsonp({api:'registration_v5_submit',token:getToken(),maBuoi:maBuoi,trangThai:status,lyDo:reason || ''});
+      if (!r.success) {
+        if (r.type === 'REASON_REQUIRED') {
+          reason = prompt(r.message || 'Vui lòng nhập lý do:', '');
+          if (reason === null || !reason.trim()) return;
+          r = await window.jsonp({api:'registration_v5_submit',token:getToken(),maBuoi:maBuoi,trangThai:status,lyDo:reason.trim()});
+        }
+      }
       if (!r.success) { alert(r.message || 'Không cập nhật được đăng ký.'); return; }
       alert(r.message || 'Đã cập nhật đăng ký.');
       await window.refreshAll();
