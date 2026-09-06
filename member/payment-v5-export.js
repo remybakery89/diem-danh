@@ -1,0 +1,6 @@
+/* VÒNG 5C — xuất danh sách thanh toán, không xuất ảnh */
+(function(){
+  const API='https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
+  function jsonp(params){return new Promise((resolve,reject)=>{const cb='pex_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script'),q=new URLSearchParams({...params,callback:cb}),t=setTimeout(()=>{cleanup();reject(new Error('Máy chủ phản hồi quá lâu.'))},15000);function cleanup(){clearTimeout(t);delete window[cb];s.remove()}window[cb]=d=>{cleanup();resolve(d)};s.onerror=()=>{cleanup();reject(new Error('Không kết nối được máy chủ.'))};s.src=API+'?'+q;document.body.appendChild(s)})}
+  window.v5cExportPayments=async function(password,maBuoi,filter){const r=await jsonp({api:'registration_v5_payment_export',password,maBuoi,filter:filter||'ALL'});if(!r.success)throw new Error(r.message||'Không xuất được danh sách.');const lines=[r.headers,...r.rows].map(row=>row.map(v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(','));const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='thanh-toan-'+maBuoi+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+})();
