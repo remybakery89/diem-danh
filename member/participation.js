@@ -61,4 +61,10 @@
   }
 
   hookProfileRender();
+
+  // Vòng 5 — tải giao diện quy trình đăng ký sau khi trang lõi đã được nạp.
+  const v5 = document.createElement('script');
+  v5.src = './registration-v5.js';
+  v5.async = true;
+  document.head.appendChild(v5);
 })();
