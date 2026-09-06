@@ -67,4 +67,10 @@
   v5.src = './registration-v5.js';
   v5.async = true;
   document.head.appendChild(v5);
+
+  // Vòng 5C — tải giao diện thanh toán sau khi trang lõi đã được nạp.
+  const payment = document.createElement('script');
+  payment.src = './payment-v5.js';
+  payment.async = true;
+  document.head.appendChild(payment);
 })();
