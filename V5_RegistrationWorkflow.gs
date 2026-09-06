@@ -48,7 +48,6 @@ function v5EnsureRegistrationStructure_() {
   }
   sheet.setFrozenRows(1);
 
-  // Nâng dữ liệu cũ sang mô hình V5 mà không thay đổi 8 cột gốc.
   const lastRow = sheet.getLastRow();
   if (lastRow >= 2) {
     const rows = sheet.getRange(2, 1, lastRow - 1, requiredLastColumn).getDisplayValues();
@@ -130,6 +129,17 @@ function v5CanSubmit_(program, now) {
   return true;
 }
 
+function v5CountGoing_(sheet, maBuoi) {
+  const rows = getRegistrationRows_(sheet);
+  let count = 0;
+  rows.forEach(function(row) {
+    if (row.maBuoi !== maBuoi) return;
+    if (row.trangThai === 'ĐÃ HỦY') return;
+    if (row.trangThai === 'ĐÃ ĐĂNG KÝ' || row.trangThai === 'ĐI') count++;
+  });
+  return count;
+}
+
 function v5SubmitRegistration_(token, maBuoi, requestedStatus, reason) {
   const member = getMemberFromRegistrationToken_(token);
   if (!member) return { success:false, type:'SESSION_EXPIRED', message:'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
@@ -148,93 +158,142 @@ function v5SubmitRegistration_(token, maBuoi, requestedStatus, reason) {
   if (!v5CanSubmit_(program)) return { success:false, type:'REGISTRATION_CLOSED', message:'Chương trình hiện không nhận đăng ký/thay đổi.' };
   if (!memberMatchesAudience_(member, program.doiTuong)) return { success:false, type:'NOT_ELIGIBLE', message:'Bạn không thuộc đối tượng được đăng ký chương trình này.' };
 
-  const now = new Date();
-  const nowString = Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
-  const ctx = v5GetRegistrationContext_(maBuoi, ma);
-  const isFirst = !ctx.rowNumber;
-  const pastDeadline = v5IsPastDeadline_(program, now);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const now = new Date();
+    const nowString = Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
+    const ctx = v5GetRegistrationContext_(maBuoi, ma);
+    const isFirst = !ctx.rowNumber;
+    const pastDeadline = v5IsPastDeadline_(program, now);
 
-  if (isFirst && pastDeadline && !reason) {
-    return { success:false, type:'REASON_REQUIRED', message:'Đăng ký sau hạn chót, vui lòng nhập lý do.' };
-  }
+    if (isFirst && pastDeadline && !reason) {
+      return { success:false, type:'REASON_REQUIRED', message:'Đăng ký sau hạn chót, vui lòng nhập lý do.' };
+    }
 
-  if (!isFirst && ctx.currentStatus !== V5_CANCELLED_STATUS && ctx.currentStatus !== '' && ctx.currentStatus !== requestedStatus) {
-    if (!reason) return { success:false, type:'REASON_REQUIRED', message:'Thay đổi đăng ký cần có lý do.' };
-  }
+    if (!isFirst && ctx.currentStatus !== V5_CANCELLED_STATUS && ctx.currentStatus !== '' && ctx.currentStatus !== requestedStatus) {
+      if (!reason) return { success:false, type:'REASON_REQUIRED', message:'Thay đổi đăng ký cần có lý do.' };
+    }
 
-  let currentStatus;
-  let pending = false;
-  if (isFirst) {
-    currentStatus = pastDeadline ? V5_PENDING_STATUS : requestedStatus;
-    pending = pastDeadline;
-  } else if (ctx.currentStatus === V5_CANCELLED_STATUS || !ctx.currentStatus) {
-    currentStatus = pastDeadline ? V5_PENDING_STATUS : requestedStatus;
-    pending = pastDeadline;
-  } else if (ctx.currentStatus === requestedStatus) {
-    return { success:false, type:'NO_CHANGE', message:'Trạng thái hiện tại đã là ' + requestedStatus + '.' };
-  } else {
-    currentStatus = V5_PENDING_STATUS;
-    pending = true;
-  }
+    if (isFirst && requestedStatus === 'ĐI' && program.gioiHan) {
+      const count = v5CountGoing_(ctx.sheet, maBuoi);
+      if (count >= program.gioiHan) {
+        return { success:false, type:'FULL', message:'Chương trình đã đủ số lượng đăng ký.' };
+      }
+    }
 
-  const historyEntry = {
-    thoiGian: nowString,
-    loai: isFirst ? 'ĐĂNG KÝ' : 'THAY ĐỔI',
-    trangThaiCu: isFirst ? '' : ctx.currentStatus,
-    trangThaiYeuCau: requestedStatus,
-    trangThaiMoi: currentStatus,
-    lyDo: reason,
-    nguoi: 'CA VIÊN'
-  };
+    if (!isFirst && ctx.currentStatus === V5_CANCELLED_STATUS && requestedStatus === 'ĐI' && program.gioiHan) {
+      const count = v5CountGoing_(ctx.sheet, maBuoi);
+      if (count >= program.gioiHan) {
+        return { success:false, type:'FULL', message:'Chương trình đã đủ số lượng đăng ký.' };
+      }
+    }
 
-  if (isFirst || ctx.currentStatus === V5_CANCELLED_STATUS || !ctx.currentStatus) {
-    const maDangKy = 'DK' + Utilities.getUuid().replace(/-/g, '').substring(0, 10).toUpperCase();
-    ctx.sheet.appendRow([maDangKy, maBuoi, ma, member.hoTen, member.be, nowString, 'ĐÃ ĐĂNG KÝ', reason]);
-    const newRow = ctx.sheet.getLastRow();
-    ctx.sheet.getRange(newRow, 9, 1, 7).setValues([[
+    let currentStatus;
+    let pending = false;
+    if (isFirst) {
+      currentStatus = pastDeadline ? V5_PENDING_STATUS : requestedStatus;
+      pending = pastDeadline;
+    } else if (ctx.currentStatus === V5_CANCELLED_STATUS || !ctx.currentStatus) {
+      currentStatus = pastDeadline ? V5_PENDING_STATUS : requestedStatus;
+      pending = pastDeadline;
+    } else if (ctx.currentStatus === requestedStatus) {
+      return { success:false, type:'NO_CHANGE', message:'Trạng thái hiện tại đã là ' + requestedStatus + '.' };
+    } else {
+      currentStatus = V5_PENDING_STATUS;
+      pending = true;
+    }
+
+    const historyEntry = {
+      thoiGian: nowString,
+      loai: isFirst ? 'ĐĂNG KÝ' : 'THAY ĐỔI',
+      trangThaiCu: isFirst ? '' : ctx.currentStatus,
+      trangThaiYeuCau: requestedStatus,
+      trangThaiMoi: currentStatus,
+      lyDo: reason,
+      nguoi: 'CA VIÊN'
+    };
+
+    if (isFirst) {
+      const maDangKy = 'DK' + Utilities.getUuid().replace(/-/g, '').substring(0, 10).toUpperCase();
+      ctx.sheet.appendRow([maDangKy, maBuoi, ma, member.hoTen, member.be, nowString, 'ĐÃ ĐĂNG KÝ', reason]);
+      const newRow = ctx.sheet.getLastRow();
+      ctx.sheet.getRange(newRow, 9, 1, 7).setValues([[
+        currentStatus,
+        pending ? requestedStatus : '',
+        reason,
+        nowString,
+        '',
+        '',
+        JSON.stringify([historyEntry])
+      ]]);
+
+      return {
+        success:true,
+        type: pending ? 'PENDING' : 'REGISTERED',
+        message: pending ? 'Đăng ký đã gửi và đang chờ Admin duyệt.' : 'Đăng ký thành công.',
+        maDangKy: maDangKy,
+        maBuoi: maBuoi,
+        ma: ma,
+        hoTen: member.hoTen,
+        be: member.be,
+        thoiGian: nowString,
+        trangThai: currentStatus,
+        trangThaiYeuCau: pending ? requestedStatus : ''
+      };
+    }
+
+    if (ctx.currentStatus === V5_CANCELLED_STATUS || !ctx.currentStatus) {
+      ctx.sheet.getRange(ctx.rowNumber, 4, 1, 5).setValues([[
+        member.hoTen,
+        member.be,
+        nowString,
+        'ĐÃ ĐĂNG KÝ',
+        reason
+      ]]);
+      ctx.sheet.getRange(ctx.rowNumber, 9, 1, 7).setValues([[
+        currentStatus,
+        pending ? requestedStatus : '',
+        reason,
+        nowString,
+        '',
+        '',
+        JSON.stringify([historyEntry])
+      ]]);
+      return {
+        success:true,
+        type: pending ? 'PENDING' : 'REACTIVATED',
+        message: pending ? 'Yêu cầu đăng ký lại đã gửi và đang chờ Admin duyệt.' : 'Đăng ký lại thành công.',
+        maDangKy: String(ctx.row[0] || '').trim(),
+        maBuoi: maBuoi,
+        ma: ma,
+        trangThai: currentStatus,
+        trangThaiYeuCau: pending ? requestedStatus : ''
+      };
+    }
+
+    ctx.sheet.getRange(ctx.rowNumber, 9, 1, 6).setValues([[
       currentStatus,
-      pending ? requestedStatus : '',
+      requestedStatus,
       reason,
       nowString,
       '',
-      '',
-      JSON.stringify([historyEntry])
+      ''
     ]]);
+    v5AppendHistory_(ctx, historyEntry);
 
     return {
       success:true,
-      type: pending ? 'PENDING' : 'REGISTERED',
-      message: pending ? 'Đăng ký đã gửi và đang chờ Admin duyệt.' : 'Đăng ký thành công.',
-      maDangKy: maDangKy,
-      maBuoi: maBuoi,
-      ma: ma,
-      hoTen: member.hoTen,
-      be: member.be,
-      thoiGian: nowString,
-      trangThai: currentStatus,
-      trangThaiYeuCau: pending ? requestedStatus : ''
+      type:'CHANGE_PENDING',
+      message:'Yêu cầu thay đổi đã gửi và đang chờ Admin duyệt.',
+      maBuoi:maBuoi,
+      ma:ma,
+      trangThai:currentStatus,
+      trangThaiYeuCau:requestedStatus
     };
+  } finally {
+    lock.releaseLock();
   }
-
-  ctx.sheet.getRange(ctx.rowNumber, 9, 1, 6).setValues([[
-    currentStatus,
-    requestedStatus,
-    reason,
-    nowString,
-    '',
-    ''
-  ]]);
-  v5AppendHistory_(ctx, historyEntry);
-
-  return {
-    success:true,
-    type:'CHANGE_PENDING',
-    message:'Yêu cầu thay đổi đã gửi và đang chờ Admin duyệt.',
-    maBuoi:maBuoi,
-    ma:ma,
-    trangThai:currentStatus,
-    trangThaiYeuCau:requestedStatus
-  };
 }
 
 function v5CancelRegistration_(token, maBuoi, reason) {
@@ -247,25 +306,31 @@ function v5CancelRegistration_(token, maBuoi, reason) {
   if (!program) return { success:false, type:'PROGRAM_NOT_FOUND', message:'Không tìm thấy chương trình.' };
   if (!v5CanSubmit_(program)) return { success:false, type:'REGISTRATION_CLOSED', message:'Chương trình đã đóng, không thể hủy.' };
 
-  const ctx = v5GetRegistrationContext_(maBuoi, member.ma);
-  if (!ctx.rowNumber || ctx.currentStatus === V5_CANCELLED_STATUS) return { success:false, type:'NOT_REGISTERED', message:'Bạn chưa có đăng ký đang hoạt động.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const ctx = v5GetRegistrationContext_(maBuoi, member.ma);
+    if (!ctx.rowNumber || ctx.currentStatus === V5_CANCELLED_STATUS) return { success:false, type:'NOT_REGISTERED', message:'Bạn chưa có đăng ký đang hoạt động.' };
 
-  const nowString = Utilities.formatDate(new Date(), TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
-  const historyEntry = {
-    thoiGian: nowString,
-    loai: 'HỦY',
-    trangThaiCu: ctx.currentStatus,
-    trangThaiYeuCau: V5_CANCELLED_STATUS,
-    trangThaiMoi: V5_CANCELLED_STATUS,
-    lyDo: reason,
-    nguoi: 'CA VIÊN'
-  };
+    const nowString = Utilities.formatDate(new Date(), TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
+    const historyEntry = {
+      thoiGian: nowString,
+      loai: 'HỦY',
+      trangThaiCu: ctx.currentStatus,
+      trangThaiYeuCau: V5_CANCELLED_STATUS,
+      trangThaiMoi: V5_CANCELLED_STATUS,
+      lyDo: reason,
+      nguoi: 'CA VIÊN'
+    };
 
-  ctx.sheet.getRange(ctx.rowNumber, 7).setValue('ĐÃ HỦY');
-  ctx.sheet.getRange(ctx.rowNumber, 9, 1, 6).setValues([[V5_CANCELLED_STATUS, '', reason, nowString, '', '']]);
-  v5AppendHistory_(ctx, historyEntry);
+    ctx.sheet.getRange(ctx.rowNumber, 7).setValue('ĐÃ HỦY');
+    ctx.sheet.getRange(ctx.rowNumber, 9, 1, 6).setValues([[V5_CANCELLED_STATUS, '', reason, nowString, '', '']]);
+    v5AppendHistory_(ctx, historyEntry);
 
-  return { success:true, type:'CANCELLED', message:'Đã hủy đăng ký.', maBuoi:maBuoi, ma:normalizeMemberCode_(member.ma) };
+    return { success:true, type:'CANCELLED', message:'Đã hủy đăng ký.', maBuoi:maBuoi, ma:normalizeMemberCode_(member.ma) };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function v5GetMyRegistrations_(token) {
@@ -359,46 +424,62 @@ function v5ApproveRegistration_(password, maDangKy, approvedStatus) {
   approvedStatus = String(approvedStatus || '').trim().toUpperCase();
   if (V5_ALLOWED_STATUS.indexOf(approvedStatus) < 0) return { success:false, type:'INVALID_STATUS', message:'Trạng thái duyệt không hợp lệ.' };
 
-  v5EnsureRegistrationStructure_();
-  const sheet = getOrCreateDangKySheet_();
-  const rows = sheet.getDataRange().getDisplayValues();
-  const target = String(maDangKy || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    v5EnsureRegistrationStructure_();
+    const sheet = getOrCreateDangKySheet_();
+    const rows = sheet.getDataRange().getDisplayValues();
+    const target = String(maDangKy || '').trim();
 
-  for (let i=1;i<rows.length;i++) {
-    if (String(rows[i][0]||'').trim() !== target) continue;
-    const current = String(rows[i][8]||'').trim().toUpperCase();
-    const requested = String(rows[i][9]||'').trim().toUpperCase();
-    if (current !== V5_PENDING_STATUS || V5_ALLOWED_STATUS.indexOf(requested)<0) {
-      return { success:false, type:'NOT_PENDING', message:'Đăng ký này không có yêu cầu chờ duyệt.' };
+    for (let i=1;i<rows.length;i++) {
+      if (String(rows[i][0]||'').trim() !== target) continue;
+      const current = String(rows[i][8]||'').trim().toUpperCase();
+      const requested = String(rows[i][9]||'').trim().toUpperCase();
+      if (current !== V5_PENDING_STATUS || V5_ALLOWED_STATUS.indexOf(requested)<0) {
+        return { success:false, type:'NOT_PENDING', message:'Đăng ký này không có yêu cầu chờ duyệt.' };
+      }
+
+      if (approvedStatus === 'ĐI') {
+        const program = getProgramByCode_(String(rows[i][1]||'').trim());
+        if (program && program.gioiHan) {
+          const count = v5CountGoing_(sheet, String(rows[i][1]||'').trim());
+          if (count >= program.gioiHan) {
+            return { success:false, type:'FULL', message:'Chương trình đã đủ số lượng đăng ký.' };
+          }
+        }
+      }
+
+      const now = new Date();
+      const nowString = Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
+      const oldReason = String(rows[i][10]||'').trim();
+      const history = v5ParseHistory_(String(rows[i][14]||'').trim());
+      history.push({
+        thoiGian:nowString,
+        loai:'ADMIN DUYỆT',
+        trangThaiCu:V5_PENDING_STATUS,
+        trangThaiYeuCau:requested,
+        trangThaiMoi:approvedStatus,
+        lyDo:oldReason,
+        nguoi:'ADMIN'
+      });
+
+      sheet.getRange(i+1, 9, 1, 7).setValues([[
+        approvedStatus,
+        '',
+        '',
+        nowString,
+        'ADMIN',
+        nowString,
+        JSON.stringify(history)
+      ]]);
+      return { success:true, type:'APPROVED', message:'Đã duyệt thành ' + approvedStatus + '.', maDangKy:target, trangThai:approvedStatus };
     }
 
-    const now = new Date();
-    const nowString = Utilities.formatDate(now, TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
-    const oldReason = String(rows[i][10]||'').trim();
-    const history = v5ParseHistory_(String(rows[i][14]||'').trim());
-    history.push({
-      thoiGian:nowString,
-      loai:'ADMIN DUYỆT',
-      trangThaiCu:V5_PENDING_STATUS,
-      trangThaiYeuCau:requested,
-      trangThaiMoi:approvedStatus,
-      lyDo:oldReason,
-      nguoi:'ADMIN'
-    });
-
-    sheet.getRange(i+1, 9, 1, 7).setValues([[
-      approvedStatus,
-      '',
-      '',
-      nowString,
-      'ADMIN',
-      nowString,
-      JSON.stringify(history)
-    ]]);
-    return { success:true, type:'APPROVED', message:'Đã duyệt thành ' + approvedStatus + '.', maDangKy:target, trangThai:approvedStatus };
+    return { success:false, type:'NOT_FOUND', message:'Không tìm thấy mã đăng ký.' };
+  } finally {
+    lock.releaseLock();
   }
-
-  return { success:false, type:'NOT_FOUND', message:'Không tìm thấy mã đăng ký.' };
 }
 
 function v5SetupRegistrationWorkflow() {
