@@ -8,13 +8,20 @@ function authorizeAvatarDrive() {
 
 function doPost(e) {
   let result;
+  let route='';
   try {
-    const p=(e&&e.parameter)||{}; const api=String(p.api||'').trim();
-    if(api==='member_avatar_upload') result=uploadMemberAvatar_(p.token,p.image);
-    else if(api==='registration_payment_upload') result=v5cUploadPayment_(p.token,p.maBuoi,p.image);
+    const p=(e&&e.parameter)||{}; route=String(p.api||'').trim();
+    if(route==='member_avatar_upload') result=uploadMemberAvatar_(p.token,p.image);
+    else if(route==='registration_payment_upload') result=v5cUploadPayment_(p.token,p.maBuoi,p.image);
     else result={success:false,message:'API không hợp lệ.'};
   } catch(err){ result={success:false,message:String(err&&err.message||err)}; }
-  const payload=JSON.stringify({type:'upload',success:!!result.success,message:result.message||'',avatar:result.avatar||'',payment:result.payment||null}).replace(/</g,'\\u003c');
+  const payload=JSON.stringify({
+    type: route==='member_avatar_upload' ? 'member_avatar_upload' : route==='registration_payment_upload' ? 'registration_payment_upload' : 'upload',
+    success:!!result.success,
+    message:result.message||'',
+    avatar:result.avatar||'',
+    payment:result.payment||null
+  }).replace(/</g,'\\u003c');
   return HtmlService.createHtmlOutput('<!doctype html><html><body><script>window.top.postMessage('+payload+', "*");</script></body></html>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
