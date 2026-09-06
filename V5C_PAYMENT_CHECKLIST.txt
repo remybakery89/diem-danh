@@ -1,0 +1,6 @@
+V5C đã chốt:
+1. Yêu cầu thanh toán từng chương trình: CÓ/KHÔNG, lưu tại BUOI cột N.
+2. Chỉ hiện/gửi thanh toán nếu chương trình CÓ yêu cầu và đăng ký ĐI/DỰ BỊ.
+3. Admin xuất CSV theo chương trình + bộ lọc, không có ảnh giao dịch.
+4. Xem ảnh: hiện trực tiếp trong popup, không mở tải file.
+5. Giữ nguyên A:M BUOI và A:T DANG_KY hiện tại.
