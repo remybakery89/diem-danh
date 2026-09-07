@@ -6,25 +6,41 @@ const REGISTRATION_MODE_PREFIX = 'REG_MODE_';
 const V5C_PAYMENT_REQUIRED_COL = 14;
 const V5C_PAYMENT_REQUIRED_HEADER = 'yêu cầu thanh toán';
 
-function adminListPrograms_(password) { const auth=verifyAdminPassword(password); if(!auth.success)return auth; return getRegistrationPrograms_(); }
+function v5cEnsurePaymentProgramStructure_(){
+  const ss=SpreadsheetApp.openById(SPREADSHEET_ID),sh=ss.getSheetByName(SHEET_BUOI);
+  if(!sh)throw new Error('Không tìm thấy sheet BUOI.');
+  if(sh.getMaxColumns()<V5C_PAYMENT_REQUIRED_COL)sh.insertColumnsAfter(sh.getMaxColumns(),V5C_PAYMENT_REQUIRED_COL-sh.getMaxColumns());
+  if(String(sh.getRange(1,V5C_PAYMENT_REQUIRED_COL).getDisplayValue()||'').trim()!==V5C_PAYMENT_REQUIRED_HEADER)sh.getRange(1,V5C_PAYMENT_REQUIRED_COL).setValue(V5C_PAYMENT_REQUIRED_HEADER);
+  return true;
+}
+
+function v5cNormalizePaymentRequired_(value){return String(value||'').trim().toUpperCase()==='CÓ'?'CÓ':'KHÔNG';}
+
+function v5cIsPaymentRequired_(maBuoi){
+  v5cEnsurePaymentProgramStructure_();
+  const sh=SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_BUOI),data=sh.getDataRange().getDisplayValues();
+  for(let i=1;i<data.length;i++)if(String(data[i][0]||'').trim()===String(maBuoi||'').trim())return v5cNormalizePaymentRequired_(data[i][13]);
+  return 'KHÔNG';
+}
+
+function adminListPrograms_(password){const auth=verifyAdminPassword(password);if(!auth.success)return auth;return getRegistrationPrograms_();}
 
 function adminSaveProgram_(password,payload){
-  const auth=verifyAdminPassword(password); if(!auth.success)return auth;
+  const auth=verifyAdminPassword(password);if(!auth.success)return auth;
   if(!payload||typeof payload!=='object')return{success:false,type:'INVALID_DATA',message:'Dữ liệu chương trình không hợp lệ.'};
   const tenBuoi=String(payload.tenBuoi||'').trim(),ngayText=String(payload.ngay||'').trim(),gioText=String(payload.gio||'').trim();
   if(!tenBuoi||!ngayText||!gioText)return{success:false,type:'MISSING_FIELDS',message:'Vui lòng nhập tên buổi, ngày và giờ.'};
   if(!/^\d{4}-\d{2}-\d{2}$/.test(ngayText))return{success:false,type:'INVALID_DATE',message:'Ngày không đúng định dạng.'};
   if(!/^\d{2}:\d{2}$/.test(gioText))return{success:false,type:'INVALID_TIME',message:'Giờ không đúng định dạng.'};
-  const gioiHan=String(payload.gioiHan||'').trim(); if(gioiHan&&(!/^\d+$/.test(gioiHan)||Number(gioiHan)<1))return{success:false,type:'INVALID_LIMIT',message:'Giới hạn phải là số nguyên dương.'};
-  const moDangKy=String(payload.moDangKy||'').trim(); if(moDangKy&&!/^\d{2}:\d{2}$/.test(moDangKy))return{success:false,type:'INVALID_OPEN_TIME',message:'Giờ mở đăng ký không hợp lệ.'};
-  const hanChot=String(payload.hanChot||'').trim(); if(hanChot&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(hanChot))return{success:false,type:'INVALID_DEADLINE',message:'Hạn chót không hợp lệ.'};
-  const requestedMode=String(payload.cheDoDangKy||'').trim().toUpperCase(); if(requestedMode&&['AUTO','CLOSED'].indexOf(requestedMode)<0)return{success:false,type:'INVALID_REGISTRATION_MODE',message:'Chế độ đăng ký không hợp lệ.'};
-  const phuongTien=String(payload.phuongTien||'').trim(); if(phuongTien&&['KHÔNG ÁP DỤNG','XE CHUNG','XE RIÊNG'].indexOf(phuongTien.toUpperCase())<0)return{success:false,type:'INVALID_TRANSPORT',message:'Phương tiện không hợp lệ.'};
-  const diemDon=String(payload.diemDon||'').trim(); if(phuongTien.toUpperCase()==='XE CHUNG'&&!diemDon)return{success:false,type:'MISSING_PICKUP',message:'Vui lòng nhập điểm đón cho xe chung.'};
-  const paymentRequired=String(payload.yeuCauThanhToan||'').trim().toUpperCase()==='CÓ'?'CÓ':'KHÔNG';
-  const ss=SpreadsheetApp.openById(SPREADSHEET_ID),sheet=ss.getSheetByName(SHEET_BUOI); if(!sheet)throw new Error('Không tìm thấy sheet BUOI.');
-  if(sheet.getMaxColumns()<V5C_PAYMENT_REQUIRED_COL)sheet.insertColumnsAfter(sheet.getMaxColumns(),V5C_PAYMENT_REQUIRED_COL-sheet.getMaxColumns());
-  sheet.getRange(1,V5C_PAYMENT_REQUIRED_COL).setValue(V5C_PAYMENT_REQUIRED_HEADER);
+  const gioiHan=String(payload.gioiHan||'').trim();if(gioiHan&&(!/^\d+$/.test(gioiHan)||Number(gioiHan)<1))return{success:false,type:'INVALID_LIMIT',message:'Giới hạn phải là số nguyên dương.'};
+  const moDangKy=String(payload.moDangKy||'').trim();if(moDangKy&&!/^\d{2}:\d{2}$/.test(moDangKy))return{success:false,type:'INVALID_OPEN_TIME',message:'Giờ mở đăng ký không hợp lệ.'};
+  const hanChot=String(payload.hanChot||'').trim();if(hanChot&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(hanChot))return{success:false,type:'INVALID_DEADLINE',message:'Hạn chót không hợp lệ.'};
+  const requestedMode=String(payload.cheDoDangKy||'').trim().toUpperCase();if(requestedMode&&['AUTO','CLOSED'].indexOf(requestedMode)<0)return{success:false,type:'INVALID_REGISTRATION_MODE',message:'Chế độ đăng ký không hợp lệ.'};
+  const phuongTien=String(payload.phuongTien||'').trim();if(phuongTien&&['KHÔNG ÁP DỤNG','XE CHUNG','XE RIÊNG'].indexOf(phuongTien.toUpperCase())<0)return{success:false,type:'INVALID_TRANSPORT',message:'Phương tiện không hợp lệ.'};
+  const diemDon=String(payload.diemDon||'').trim();if(phuongTien.toUpperCase()==='XE CHUNG'&&!diemDon)return{success:false,type:'MISSING_PICKUP',message:'Vui lòng nhập điểm đón cho xe chung.'};
+  const paymentRequired=v5cNormalizePaymentRequired_(payload.yeuCauThanhToan);
+  const ss=SpreadsheetApp.openById(SPREADSHEET_ID),sheet=ss.getSheetByName(SHEET_BUOI);if(!sheet)throw new Error('Không tìm thấy sheet BUOI.');
+  v5cEnsurePaymentProgramStructure_();
   const lock=LockService.getScriptLock();lock.waitLock(5000);
   try{
     const maBuoiInput=String(payload.maBuoi||'').trim(),data=sheet.getDataRange().getValues();let rowNumber=-1;
