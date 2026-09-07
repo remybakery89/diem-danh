@@ -14,6 +14,8 @@ function v5cEnsurePaymentProgramStructure_(){
   return true;
 }
 
+function setupPaymentProgramStructure(){return v5cEnsurePaymentProgramStructure_();}
+
 function v5cNormalizePaymentRequired_(value){return String(value||'').trim().toUpperCase()==='CÓ'?'CÓ':'KHÔNG';}
 
 function v5cIsPaymentRequired_(maBuoi){
