@@ -299,4 +299,258 @@
 </div>
 
 <script>
-const API = '
+const API = 'https://diem-danh-api.remybakery89.workers.dev';
+let password = sessionStorage.getItem('adminRegistrationPassword') || '';
+let editCode = new URLSearchParams(location.search).get('maBuoi') || '';
+let programs = [];
+
+function jsonp(params) {
+  return new Promise((resolve, reject) => {
+    const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const q = new URLSearchParams({ ...params, callback: cb });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Kết nối máy chủ quá lâu.'));
+    }, 15000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      script.remove();
+    }
+
+    window[cb] = d => {
+      cleanup();
+      resolve(d);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Không kết nối được máy chủ.'));
+    };
+
+    script.src = API + '?' + q;
+    document.body.appendChild(script);
+  });
+}
+
+function msg(text, ok = false) {
+  const e = document.getElementById('msg');
+  e.textContent = text;
+  e.className = 'notice ' + (ok ? 'success' : 'error');
+  e.classList.remove('hidden');
+}
+
+function showModal(title, text) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent = text;
+  document.getElementById('successModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('successModal').classList.add('hidden');
+}
+
+function back() {
+  location.href = 'admin-dashboard.html';
+}
+
+function toggleFormMode() {
+  const loai = document.getElementById('loaiBuoi').value;
+  const isTapHat = loai === 'TAP_HAT';
+  const eventFields = document.querySelectorAll('.event-field');
+  const hint = document.getElementById('loaiHint');
+  const tenBuoiInput = document.getElementById('tenBuoi');
+
+  eventFields.forEach(el => {
+    el.style.display = isTapHat ? 'none' : 'block';
+  });
+
+  if (isTapHat) {
+    hint.textContent = 'Buổi tập hát: Toàn bộ ca viên active đều quét được điểm danh, không cần đăng ký trước.';
+    if (!tenBuoiInput.value || tenBuoiInput.value === 'Lưu diễn / Sự kiện') {
+      tenBuoiInput.value = 'Tập hát thường kỳ';
+    }
+  } else {
+    hint.textContent = 'Sự kiện / Lưu diễn: Ca viên phải đăng ký trên trang cá nhân mới được phép điểm danh.';
+    if (tenBuoiInput.value === 'Tập hát thường kỳ') {
+      tenBuoiInput.value = '';
+    }
+    togglePickup();
+  }
+}
+
+async function login() {
+  const p = document.getElementById('password').value;
+  if (!p) return msg('Vui lòng nhập mật khẩu.');
+  document.getElementById('loginBtn').disabled = true;
+  try {
+    const r = await jsonp({ api: 'registration_admin', password: p });
+    if (!r.success) {
+      msg(r.message || 'Mật khẩu không đúng.');
+      return;
+    }
+    password = p;
+    sessionStorage.setItem('adminRegistrationPassword', p);
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    await loadPrograms();
+    if (editCode) await loadEdit();
+  } catch (e) {
+    msg(e.message);
+  } finally {
+    document.getElementById('loginBtn').disabled = false;
+  }
+}
+
+async function loadPrograms() {
+  const r = await jsonp({ api: 'registration_programs' });
+  if (!r.success) {
+    msg(r.message || 'Không tải được chương trình.');
+    return;
+  }
+  programs = r.programs || [];
+  renderProgramList();
+}
+
+function statusHtml(p) {
+  const s = String(p.trangThai || '');
+  const cls = s === 'ĐANG MỞ' ? 'status-open' : s === 'ĐÃ ĐÓNG' ? 'status-closed' : s === 'ĐÃ KẾT THÚC' ? 'status-ended' : 'status-wait';
+  return `<span class="status ${cls}">${esc(s)}</span>`;
+}
+
+function renderProgramList() {
+  const q = document.getElementById('programSearch').value.trim().toLowerCase();
+  const list = programs.filter(p => !q || [p.maBuoi, p.tenBuoi, p.ngay].join(' ').toLowerCase().includes(q));
+  const box = document.getElementById('programList');
+  box.innerHTML = list.length ? list.map(p => `
+    <div class="program-item">
+      <div>
+        <h3>${esc(p.tenBuoi)}</h3>
+        <p>${esc(p.maBuoi)} · ${esc(p.ngay)}${p.gio ? ' · ' + esc(p.gio) : ''}${p.diaDiem ? ' · ' + esc(p.diaDiem) : ''}</p>
+        <p>${statusHtml(p)} · ${p.cheDoDangKy === 'CLOSED' ? 'ĐÓNG THỦ CÔNG' : 'MỞ TỰ ĐỘNG'}</p>
+      </div>
+      <button onclick="editProgram('${encodeURIComponent(p.maBuoi)}')">Chỉnh sửa</button>
+    </div>
+  `).join('') : '<p class="muted">Không tìm thấy chương trình.</p>';
+}
+
+function editProgram(encoded) {
+  editCode = decodeURIComponent(encoded);
+  history.replaceState({}, '', location.pathname + '?maBuoi=' + encodeURIComponent(editCode));
+  loadEdit();
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+}
+
+async function loadEdit() {
+  const r = await jsonp({ api: 'admin_program_get', password, maBuoi: editCode });
+  if (!r.success) {
+    msg(r.message || 'Không tải được chương trình.');
+    return;
+  }
+  const p = r.program;
+  
+  // Tự động nhận diện loại buổi khi chỉnh sửa
+  const isTapHat = /tập hát|tap hat/i.test(p.tenBuoi || '');
+  document.getElementById('loaiBuoi').value = isTapHat ? 'TAP_HAT' : 'SU_KIEN';
+  toggleFormMode();
+
+  ['tenBuoi', 'diaDiem', 'ngay', 'gio', 'moDangKy', 'hanChot', 'gioiHan', 'ghiChu', 'diemDon'].forEach(k => {
+    if (document.getElementById(k)) document.getElementById(k).value = p[k] || '';
+  });
+  
+  document.getElementById('doiTuong').value = p.doiTuong || 'TẤT CẢ';
+  document.getElementById('cheDoDangKy').value = p.cheDoDangKy || 'AUTO';
+  document.getElementById('phuongTien').value = p.phuongTien || 'KHÔNG ÁP DỤNG';
+  togglePickup();
+  document.getElementById('title').textContent = 'Chỉnh sửa chương trình';
+  document.getElementById('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function save(e) {
+  e.preventDefault();
+  const loai = document.getElementById('loaiBuoi').value;
+  const isTapHat = loai === 'TAP_HAT';
+
+  const payload = {
+    maBuoi: editCode,
+    tenBuoi: document.getElementById('tenBuoi').value.trim(),
+    ngay: document.getElementById('ngay').value,
+    gio: document.getElementById('gio').value,
+    diaDiem: isTapHat ? 'Phòng tập' : document.getElementById('diaDiem').value.trim(),
+    moDangKy: isTapHat ? '' : document.getElementById('moDangKy').value,
+    hanChot: isTapHat ? '' : document.getElementById('hanChot').value,
+    gioiHan: isTapHat ? '' : document.getElementById('gioiHan').value.trim(),
+    doiTuong: isTapHat ? 'TẤT CẢ' : document.getElementById('doiTuong').value,
+    ghiChu: isTapHat ? '' : document.getElementById('ghiChu').value.trim(),
+    cheDoDangKy: isTapHat ? 'AUTO' : document.getElementById('cheDoDangKy').value,
+    phuongTien: isTapHat ? 'KHÔNG ÁP DỤNG' : document.getElementById('phuongTien').value,
+    diemDon: isTapHat ? '' : document.getElementById('diemDon').value.trim()
+  };
+
+  const wasEditing = !!editCode;
+  const b = document.getElementById('saveBtn');
+  b.disabled = true;
+  b.textContent = 'Đang lưu...';
+
+  try {
+    const r = await jsonp({
+      api: 'admin_program_save',
+      password,
+      payload: JSON.stringify(payload)
+    });
+    if (!r.success) {
+      msg(r.message || 'Không lưu được.');
+      return;
+    }
+    editCode = r.maBuoi;
+    history.replaceState({}, '', location.pathname + '?maBuoi=' + encodeURIComponent(editCode));
+    document.getElementById('title').textContent = 'Chỉnh sửa chương trình';
+    await loadPrograms();
+    showModal(wasEditing ? 'Đã cập nhật chương trình' : 'Đã tạo chương trình', `Mã chương trình: ${r.maBuoi}`);
+  } catch (e) {
+    msg(e.message);
+  } finally {
+    b.disabled = false;
+    b.textContent = 'Lưu chương trình';
+  }
+}
+
+function resetForm() {
+  document.getElementById('form').reset();
+  document.getElementById('loaiBuoi').value = 'TAP_HAT';
+  document.getElementById('tenBuoi').value = 'Tập hát thường kỳ';
+  document.getElementById('gio').value = '19:30';
+  document.getElementById('cheDoDangKy').value = 'AUTO';
+  document.getElementById('phuongTien').value = 'KHÔNG ÁP DỤNG';
+  toggleFormMode();
+  togglePickup();
+  editCode = '';
+  history.replaceState({}, '', location.pathname);
+  document.getElementById('title').textContent = 'Tạo chương trình';
+}
+
+function togglePickup() {
+  const isShared = document.getElementById('phuongTien').value === 'XE CHUNG';
+  const wrap = document.getElementById('pickupWrap');
+  wrap.style.display = isShared ? 'block' : 'none';
+  document.getElementById('diemDon').required = isShared;
+}
+
+document.getElementById('phuongTien').onchange = togglePickup;
+document.getElementById('loginBtn').onclick = login;
+document.getElementById('password').onkeydown = e => { if (e.key === 'Enter') login(); };
+document.getElementById('form').onsubmit = save;
+document.getElementById('programSearch').oninput = renderProgramList;
+
+if (password) {
+  document.getElementById('password').value = password;
+  login();
+}
+</script>
+</body>
+</html>
