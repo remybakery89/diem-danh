@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản trị điểm danh</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f3f5f8;font-family:Arial,sans-serif;color:#202124}
+    .app{max-width:1150px;margin:auto;padding:24px 18px 50px}
+    .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .login-card{width:100%;max-width:420px;background:#fff;border-radius:20px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,.08);text-align:center}
+    .login-icon{font-size:48px}.login-title{font-size:25px;font-weight:bold;margin-top:8px}
+    .login-subtitle{color:#6b7280;margin:6px 0 22px}
+    .login-input{width:100%;padding:15px;border:2px solid #ddd;border-radius:12px;font-size:18px;outline:none}
+    .login-input:focus{border-color:#4285f4}
+    .login-button,.primary{width:100%;padding:14px;border:0;border-radius:12px;background:#4285f4;color:#fff;font-size:16px;font-weight:bold;cursor:pointer}
+    .login-button{margin-top:12px}.login-button:disabled,.primary:disabled{opacity:.6}
+    .login-error{margin-top:12px;color:#c5221f;min-height:20px;font-size:14px}
+    .header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:18px}
+    h1{margin:0;font-size:28px}.sub{color:#6b7280;margin-top:5px}
+    .header-actions{display:flex;gap:8px}
+    .btn{border:0;border-radius:10px;padding:11px 15px;font-weight:bold;cursor:pointer}
+    .btn-blue{background:#4285f4;color:#fff}.btn-gray{background:#e8eaed;color:#333}
+    .btn-green{background:#188038;color:#fff}
+    .btn-purple{background:#7e57c2;color:#fff}
+    .btn-orange{background:#f29900;color:#fff}
+    .btn:hover{filter:brightness(.97)}
+    .session-picker{background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 3px 14px rgba(0,0,0,.06)}
+    .session-picker label{display:block;font-weight:bold;margin-bottom:8px}
+    .session-select{width:100%;padding:13px;border:2px solid #ddd;border-radius:11px;background:#fff;font-size:16px}
+    .session-meta{margin-top:9px;color:#666;font-size:14px}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+    .stat{background:#fff;border-radius:16px;padding:18px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+    .stat-number{font-size:28px;font-weight:bold}.stat-label{margin-top:4px;color:#6b7280;font-size:13px}
+    .card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 3px 15px rgba(0,0,0,.07);margin-bottom:16px}
+    .notice{padding:14px;border-radius:12px;background:#f1f3f4;color:#555;text-align:center}
+    .tap-note{padding:14px;border-radius:12px;background:#eaf2ff;color:#1967d2;font-weight:bold;margin-bottom:14px}
+    .filters{display:grid;grid-template-columns:1fr 180px 180px;gap:9px;margin-bottom:14px}
+    .filters input,.filters select{width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:14px;background:#fff}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:780px}
+    th{background:#f1f3f4;text-align:left;padding:11px;font-size:13px}
+    td{padding:12px 11px;border-bottom:1px solid #eee;vertical-align:middle}
+    tr.warning-row{background:#fff0f0}
+    .name{font-weight:bold}.phone{font-family:monospace}
+    .badge{display:inline-block;padding:5px 9px;border-radius:20px;font-size:12px;font-weight:bold}
+    .present{background:#e8f5e9;color:#137333}.absent{background:#fce8e6;color:#c5221f}
+    .permit{background:#fff8e1;color:#9a6700}.danger{background:#fce8e6;color:#c5221f}
+    .action-btn{border:0;border-radius:9px;padding:8px 10px;font-weight:bold;cursor:pointer}
+    .allow{background:#4285f4;color:#fff}.remove{background:#e8eaed;color:#333}
+    .summary{font-size:12px;color:#666;margin-top:5px}
+    .alert{font-weight:bold;color:#c5221f;margin-top:4px}
+    .be-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+    .be-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .be-name{font-weight:bold}.be-info{font-size:13px;color:#666;margin-top:5px}
+    .section-title{font-weight:bold;margin:10px 0 6px;color:#444}
+    .loading{text-align:center;padding:35px;color:#777}
+    .empty{text-align:center;padding:30px;color:#777}
+    @media(max-width:700px){
+      .app{padding:16px 12px 35px}.header{align-items:flex-start}.header h1{font-size:23px}
+      .stats{gap:7px}.stat{padding:14px 6px}.stat-number{font-size:24px}
+      .filters{grid-template-columns:1fr}.header-actions{flex-direction:column}
+    }
+
+    .qr-manager-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;overflow:auto;padding:25px}
+    .qr-manager{max-width:1100px;margin:0 auto;background:#fff;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.25);overflow:hidden}
+    .qr-manager-header{display:flex;justify-content:space-between;align-items:center;padding:20px 22px;border-bottom:1px solid #eee}
+    .qr-manager-title{font-size:23px;font-weight:bold}
+    .qr-manager-subtitle{color:#777;font-size:13px;margin-top:4px}
+    .qr-close{width:38px;height:38px;border:0;border-radius:50%;background:#eee;cursor:pointer;font-size:18px}
+    .qr-manager-body{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;padding:20px}
+    .qr-panel{background:#f8f9fa;border-radius:15px;padding:16px}
+    .qr-panel-title{font-size:17px;font-weight:bold;margin-bottom:12px}
+    .qr-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+    .qr-toolbar input{flex:1;min-width:200px;padding:11px;border:2px solid #ddd;border-radius:10px}
+    .qr-member-list{max-height:430px;overflow:auto;background:#fff;border-radius:12px;border:1px solid #eee}
+    .qr-member{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid #eee;cursor:pointer}
+    .qr-member:hover{background:#f5f7fa}
+    .qr-member input{width:18px;height:18px}
+    .qr-member-name{font-weight:bold}
+    .qr-member-code{color:#777;font-family:monospace;font-size:12px;margin-left:5px}
+    .qr-selected-info{margin:15px 0;padding:12px;background:#fff;border-radius:10px;text-align:center}
+    .qr-main-button{width:100%;margin-top:8px}
+    .qr-progress{margin-top:12px;min-height:20px;text-align:center;color:#666;font-size:13px}
+    .qr-preview-section{padding:0 20px 25px}
+    .qr-preview-wrap{text-align:center;background:#f8f9fa;border-radius:15px;padding:15px;margin-bottom:12px;overflow:auto}
+    #qrCanvas{max-width:100%;height:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+    @media(max-width:750px){
+      .qr-manager-overlay{padding:10px}
+      .qr-manager-body{grid-template-columns:1fr}
+      .qr-manager-title{font-size:19px}
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <div class="login-title">Quản trị điểm danh</div>
+    <div class="login-subtitle">Vui lòng nhập mật khẩu quản trị</div>
+    <input id="adminPassword" class="login-input" type="password" placeholder="Mật khẩu" onkeydown="handleLoginEnter(event)">
+    <button id="loginButton" class="login-button" onclick="loginAdmin()">ĐĂNG NHẬP</button>
+    <div id="loginError" class="login-error"></div>
+  </div>
+</div>
+
+<div class="app" id="dashboard" style="display:none">
+  <div class="header">
+    <div>
+      <h1>📊 Quản trị điểm danh</h1>
+      <div class="sub" id="sessionTitle">Chưa chọn buổi</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-purple" onclick="openQRManager()">📷 Quản lý QR</button>
+      <button class="btn btn-orange" onclick="printList()">🖨️ In danh sách</button>
+      <button class="btn btn-green" onclick="exportCSV()">📥 Xuất CSV</button>
+      <button class="btn btn-gray" onclick="goHome()">← Quét QR</button>
+      <button class="btn btn-blue" onclick="reloadCurrent()">🔄 Làm mới</button>
+    </div>
+  </div>
+
+  <div class="session-picker">
+    <label for="sessionSelect">📅 Chọn buổi cần quản lý</label>
+    <select id="sessionSelect" class="session-select" onchange="changeSession()">
+      <option value="">Đang tải danh sách buổi...</option>
+    </select>
+    <div id="sessionMeta" class="session-meta"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-number" id="total">-</div><div class="stat-label">Tổng active</div></div>
+    <div class="stat"><div class="stat-number" id="present">-</div><div class="stat-label">Đã có mặt</div></div>
+    <div class="stat"><div class="stat-number" id="absent">-</div><div class="stat-label">Chưa có mặt</div></div>
+  </div>
+
+  <div id="tapHatNotice"></div>
+  <div class="be-stats" id="beStats"></div>
+  <div class="section-title">👤 Thống kê giới tính</div>
+  <div class="be-stats" id="gioiTinhStats"></div>
+
+  <div class="card">
+    <div class="filters">
+      <input id="search" type="text" placeholder="🔎 Tìm tên hoặc SĐT..." oninput="renderTable()">
+      <select id="filterBe" onchange="renderTable()"><option value="ALL">Tất cả bè</option></select>
+      <select id="filterStatus" onchange="renderTable()">
+        <option value="ALL">Tất cả trạng thái</option>
+        <option value="PRESENT">✓ Có mặt</option>
+        <option value="ABSENT">Chưa có mặt</option>
+        <option value="PERMIT">🟡 Vắng phép</option>
+        <option value="UNPERMITTED">🔴 Vắng không phép</option>
+      </select>
+    </div>
+    <div id="tableWrap"><div class="loading">Đang tải...</div></div>
+  </div>
+</div>
+
+<!-- MODULE QUẢN LÝ QR -->
+<div id="qrManager" style="display:none" class="qr-manager-overlay">
+  <div class="qr-manager">
+    <div class="qr-manager-header">
+      <div>
+        <div class="qr-manager-title">📷 Quản lý QR ca viên</div>
+        <div class="qr-manager-subtitle">Tạo ảnh QR từ mã cá nhân đã lưu trong hệ thống</div>
+      </div>
+      <button class="qr-close" onclick="closeQRManager()">✕</button>
+    </div>
+
+    <div class="qr-manager-body">
+      <div class="qr-panel">
+        <div class="qr-panel-title">👤 Chọn ca viên</div>
+        <div class="qr-toolbar">
+          <input id="qrSearch" type="text" placeholder="🔎 Tìm tên hoặc mã..." oninput="filterQRMembers()">
+          <button class="btn btn-gray" onclick="selectAllQRMembers()">☑ Chọn tất cả</button>
+          <button class="btn btn-gray" onclick="clearAllQRMembers()">☐ Bỏ chọn</button>
+        </div>
+        <div id="qrMemberList" class="qr-member-list"></div>
+      </div>
+
+      <div class="qr-panel">
+        <div class="qr-selected-info">Đã chọn: <strong id="qrSelectedCount">0</strong> ca viên</div>
+        <button id="qrPreviewButton" class="btn btn-blue qr-main-button" onclick="createSelectedQR(false)">🖼️ Tạo xem trước</button>
+        <button id="qrBatchButton" class="btn btn-green qr-main-button" onclick="createSelectedQR(true)">📦 Tải file ZIP hàng loạt</button>
+        <div id="qrProgress" class="qr-progress"></div>
+      </div>
+    </div>
+
+    <div id="qrPreviewSection" class="qr-preview-section" style="display:none">
+      <div class="qr-panel-title">👁️ Xem trước</div>
+      <div class="qr-preview-wrap"><canvas id="qrCanvas"></canvas></div>
+      <button class="btn btn-blue" onclick="downloadCurrentQR()">⬇️ Tải ảnh này</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://diem-danh-api.remybakery89.workers.dev';
+let adminPassword = sessionStorage.getItem('adminRegistrationPassword') || '';
+let members = [];
+let sessions = [];
+let currentSession = '';
+let qrMembers = [];
+let qrCurrentCanvas = null;
+
+function jsonp(params) {
+  return new Promise((resolve, reject) => {
+    const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const q = new URLSearchParams({ ...params, callback: cb });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Kết nối máy chủ quá lâu.'));
+    }, 15000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.remove();
+    }
+
+    window[cb] = d => {
+      cleanup();
+      resolve(d);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Không kết nối được máy chủ.'));
+    };
+
+    script.src = API + '?' + q;
+    document.body.appendChild(script);
+  });
+}
+
+function handleLoginEnter(e) { if (e.key === 'Enter') loginAdmin(); }
+
+async function loginAdmin() {
+  const input = document.getElementById('adminPassword');
+  const button = document.getElementById('loginButton');
+  const error = document.getElementById('loginError');
+  const password = input.value.trim();
+  if (!password) { error.textContent = 'Vui lòng nhập mật khẩu.'; input.focus(); return; }
+
+  button.disabled = true; button.textContent = 'ĐANG KIỂM TRA...'; error.textContent = '';
+  try {
+    const r = await jsonp({ api: 'registration_admin', password: password });
+    if (!r.success) {
+      error.textContent = r.message || 'Mật khẩu không đúng.';
+      button.disabled = false; button.textContent = 'ĐĂNG NHẬP'; input.select(); return;
+    }
+    adminPassword = password;
+    sessionStorage.setItem('adminRegistrationPassword', password);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    await loadSessions();
+  } catch (err) {
+    error.textContent = err.message || 'Không thể kết nối hệ thống.';
+    button.disabled = false; button.textContent = 'ĐĂNG NHẬP';
+  }
+}
+
+async function loadSessions() {
+  document.getElementById('sessionSelect').innerHTML = '<option value="">Đang tải danh sách buổi...</option>';
+  try {
+    const r = await jsonp({ api: 'admin_get_sessions', password: adminPassword });
+    if (!r.success) { showTableMessage(r.message || 'Không tải được danh sách buổi.'); return; }
+    sessions = r.sessions || [];
+    renderSessionOptions();
+    currentSession = findPreferredSession();
+    document.getElementById('sessionSelect').value = currentSession;
+    await loadSelectedSession();
+  } catch (err) {
+    showTableMessage(err.message || 'Không tải được danh sách buổi.');
+  }
+}
+
+function findPreferredSession() {
+  if (!sessions.length) return '';
+  const today = new Date();
+  const ymd = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const todaySession = sessions.find(s => s.ngayKey === ymd);
+  return todaySession ? todaySession.maBuoi : sessions[0].maBuoi;
+}
+
+function renderSessionOptions() {
+  const select = document.getElementById('sessionSelect');
+  select.innerHTML = '<option value="">-- Chọn buổi --</option>';
+  sessions.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.maBuoi;
+    opt.textContent = s.maBuoi + ' — ' + s.ngay + ' ' + (s.gio || '') + ' — ' + s.tenBuoi;
+    select.appendChild(opt);
+  });
+}
+
+function changeSession() {
+  currentSession = document.getElementById('sessionSelect').value;
+  loadSelectedSession();
+}
+
+function reloadCurrent() { loadSelectedSession(); }
+
+async function loadSelectedSession() {
+  if (!currentSession) { showTableMessage('Hãy chọn một buổi.'); return; }
+  document.getElementById('tableWrap').innerHTML = '<div class="loading">Đang tải dữ liệu buổi...</div>';
+  try {
+    const data = await jsonp({ api: 'admin_get_attendance_data', password: adminPassword, maBuoi: currentSession });
+    if (!data || !data.success) { showTableMessage(data.message || 'Không tải được dữ liệu.'); return; }
+    members = data.members || [];
+    const b = data.buoi;
+    document.getElementById('sessionTitle').textContent = b ? b.maBuoi + ' • ' + b.tenBuoi : 'Không có buổi';
+    document.getElementById('sessionMeta').textContent = b ? (b.ngay + (b.gio ? ' • ' + b.gio : '')) : '';
+    document.getElementById('total').textContent = data.thongKe.tong;
+    document.getElementById('present').textContent = data.thongKe.daCoMat;
+    document.getElementById('absent').textContent = data.thongKe.chuaCoMat;
+
+    const notice = document.getElementById('tapHatNotice');
+    if (data.isTapHat) {
+      notice.innerHTML = '<div class="tap-note">🎤 Buổi Tập hát — Quản lý điểm danh và cho phép vắng trực tiếp.</div>';
+    } else {
+      notice.innerHTML = '<div class="notice">Buổi Sự kiện / Lưu diễn.</div>';
+    }
+
+    buildBeFilter(data.beStats);
+    renderGioiTinhStats(data.gioiTinhStats);
+    renderTable();
+  } catch (err) {
+    showTableMessage(err.message || 'Không thể tải dữ liệu.');
+  }
+}
+
+function buildBeFilter(stats) {
+  const select = document.getElementById('filterBe');
+  const current = select.value;
+  const bes = Object.keys(stats || {}).sort((a, b) => a.localeCompare(b, 'vi'));
+  select.innerHTML = '<option value="ALL">Tất cả bè</option>';
+  bes.forEach(be => {
+    const opt = document.createElement('option'); opt.value = be; opt.textContent = be; select.appendChild(opt);
+  });
+  if (bes.includes(current)) select.value = current;
+  document.getElementById('beStats').innerHTML = bes.map(be => {
+    const x = stats[be];
+    return `<div class="be-card"><div class="be-name">${escapeHtml(be)}</div><div class="be-info">${x.coMat} có mặt / ${x.tong} người<br>${x.vang} chưa có mặt</div></div>`;
+  }).join('');
+}
+
+function renderGioiTinhStats(stats) {
+  const container = document.getElementById('gioiTinhStats');
+  const keys = Object.keys(stats || {});
+  if (!keys.length) { container.innerHTML = ''; return; }
+  container.innerHTML = keys.map(gt => {
+    const item = stats[gt];
+    return `<div class="be-card"><div class="be-name">${escapeHtml(gt)}</div><div class="be-info">${item.coMat} có mặt / ${item.tong} người<br>${item.vang} chưa có mặt</div></div>`;
+  }).join('');
+}
+
+function getFilteredMembers() {
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  const be = document.getElementById('filterBe').value;
+  const status = document.getElementById('filterStatus').value;
+  return members.filter(m => {
+    const ms = !search || m.hoTen.toLowerCase().includes(search) || m.sdt.toLowerCase().includes(search);
+    const mb = be === 'ALL' || m.be === be;
+    let mt = true;
+    if (status === 'PRESENT') mt = m.daDiemDanh;
+    if (status === 'ABSENT') mt = !m.daDiemDanh && !m.vang;
+    if (status === 'PERMIT') mt = m.vang && m.loaiVang === 'PHÉP';
+    if (status === 'UNPERMITTED') mt = m.vang && m.loaiVang === 'KHÔNG PHÉP';
+    return ms && mb && mt;
+  }).sort((a, b) => {
+    if (a.daDiemDanh !== b.daDiemDanh) return a.daDiemDanh ? -1 : 1;
+    return a.hoTen.localeCompare(b.hoTen, 'vi');
+  });
+}
+
+function renderTable() {
+  const list = getFilteredMembers();
+  if (!list.length) { showTableMessage('Không tìm thấy ca viên.'); return; }
+  const isTapHat = sessions.find(s => s.maBuoi === currentSession)?.isTapHat;
+  let html = '<table><thead><tr><th>#</th><th>Ca viên</th><th>SĐT</th><th>Bè</th><th>Trạng thái</th><th>Thời gian</th><th>Thao tác</th></tr></thead><tbody>';
+  list.forEach((m, i) => {
+    let status = '';
+    if (m.daDiemDanh) status = '<span class="badge present">✓ Có mặt</span>';
+    else if (m.vang && m.loaiVang === 'PHÉP') status = '<span class="badge permit">🟡 Vắng phép</span>';
+    else if (m.vang && m.loaiVang === 'KHÔNG PHÉP') status = '<span class="badge danger">🔴 Vắng không phép</span>';
+    else status = '<span class="badge absent">Chưa có mặt</span>';
+
+    let action = '—';
+    if (!m.daDiemDanh) {
+      if (m.vang && m.loaiVang === 'PHÉP') {
+        action = `<button class="action-btn remove" onclick="clearAbsence('${escapeJs(m.ma)}')">↩ Bỏ phép</button>`;
+      } else {
+        action = `<button class="action-btn allow" onclick="setPermit('${escapeJs(m.ma)}')">✓ Cho phép</button>`;
+      }
+    }
+    html += `<tr><td>${i + 1}</td><td class="name">${escapeHtml(m.hoTen)}</td><td class="phone">${escapeHtml(m.sdt)}</td><td>${escapeHtml(m.be)}</td><td>${status}</td><td>${m.daDiemDanh ? escapeHtml(m.thoiGian) : '—'}</td><td>${action}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+async function setPermit(ma) {
+  if (!currentSession || !confirm('Xác nhận cho phép vắng ca viên này?')) return;
+  try {
+    const r = await jsonp({ api: 'admin_set_absence', password: adminPassword, maBuoi: currentSession, ma: ma, loaiVang: 'PHÉP' });
+    if (!r.success) { alert(r.message || 'Lỗi'); return; }
+    const m = members.find(x => x.ma === ma);
+    if (m) { m.vang = true; m.loaiVang = 'PHÉP'; }
+    renderTable();
+  } catch (err) { alert(err.message); }
+}
+
+async function clearAbsence(ma) {
+  if (!currentSession || !confirm('Bỏ vắng phép ca viên này?')) return;
+  try {
+    const r = await jsonp({ api: 'admin_clear_absence', password: adminPassword, maBuoi: currentSession, ma: ma });
+    if (!r.success) { alert(r.message || 'Lỗi'); return; }
+    const m = members.find(x => x.ma === ma);
+    if (m) { m.vang = false; m.loaiVang = ''; }
+    renderTable();
+  } catch (err) { alert(err.message); }
+}
+
+/* MODULE TẠO QR ĐỘC LẬP */
+function openQRManager() {
+  document.getElementById('qrManager').style.display = 'block';
+  qrMembers = members.map(m => ({ ma: m.ma, hoTen: m.hoTen }));
+  renderQRMembers();
+}
+
+function closeQRManager() { document.getElementById('qrManager').style.display = 'none'; }
+
+function renderQRMembers() {
+  const search = (document.getElementById('qrSearch').value || '').trim().toLowerCase();
+  const list = qrMembers.filter(m => !search || m.ma.toLowerCase().includes(search) || m.hoTen.toLowerCase().includes(search));
+  const box = document.getElementById('qrMemberList');
+  if (!list.length) { box.innerHTML = '<div class="empty">Không tìm thấy ca viên.</div>'; return; }
+  box.innerHTML = list.map(m => `
+    <label class="qr-member">
+      <input type="checkbox" class="qr-member-check" value="${escapeHtml(m.ma)}" onchange="updateQRSelectedCount()">
+      <div><span class="qr-member-name">${escapeHtml(m.hoTen)}</span><span class="qr-member-code">${escapeHtml(m.ma)}</span></div>
+    </label>
+  `).join('');
+  updateQRSelectedCount();
+}
+
+function filterQRMembers() { renderQRMembers(); }
+function selectAllQRMembers() { document.querySelectorAll('.qr-member-check').forEach(i => i.checked = true); updateQRSelectedCount(); }
+function clearAllQRMembers() { document.querySelectorAll('.qr-member-check').forEach(i => i.checked = false); updateQRSelectedCount(); }
+function updateQRSelectedCount() { document.getElementById('qrSelectedCount').textContent = document.querySelectorAll('.qr-member-check:checked').length; }
+
+function getSelectedQRMembers() {
+  const checked = Array.from(document.querySelectorAll('.qr-member-check:checked')).map(i => i.value);
+  return qrMembers.filter(m => checked.includes(m.ma));
+}
+
+async function createSelectedQR(batch) {
+  const selected = getSelectedQRMembers();
+  if (!selected.length) { alert('Hãy chọn ít nhất một ca viên.'); return; }
+  const progress = document.getElementById('qrProgress');
+
+  if (!batch) {
+    progress.textContent = 'Đang tạo ảnh preview...';
+    const canvas = await generateQRCanvas(selected[0]);
+    qrCurrentCanvas = canvas;
+    document.getElementById('qrPreviewSection').style.display = 'block';
+    const preview = document.getElementById('qrCanvas');
+    preview.width = canvas.width; preview.height = canvas.height;
+    preview.getContext('2d').drawImage(canvas, 0, 0);
+    progress.textContent = 'Đã tạo: ' + selected[0].hoTen;
+  } else {
+    const zip = new JSZip();
+    for (let i = 0; i < selected.length; i++) {
+      const m = selected[i];
+      progress.textContent = `Đang tạo ${i + 1}/${selected.length}: ${m.hoTen}`;
+      const canvas = await generateQRCanvas(m);
+      const dataUrl = canvas.toDataURL('image/png').split(',')[1];
+      zip.file(`${m.ma}_${m.hoTen.replace(/[^a-zA-Z0-9]/g, '_')}.png`, dataUrl, { base64: true });
+    }
+    progress.textContent = 'Đang nén ZIP...';
+    const content = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = 'QR_CaVien.zip'; a.click();
+    progress.textContent = '✅ Đã tải file zip thành công!';
+  }
+}
+
+function generateQRCanvas(member) {
+  return new Promise(resolve => {
+    const div = document.createElement('div');
+    new QRCode(div, { text: member.ma, width: 350, height: 350, correctLevel: QRCode.CorrectLevel.H });
+    setTimeout(() => {
+      const qrImg = div.querySelector('canvas') || div.querySelector('img');
+      const canvas = document.createElement('canvas');
+      canvas.width = 450; canvas.height = 530;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 450, 530);
+      ctx.drawImage(qrImg, 50, 40, 350, 350);
+      ctx.fillStyle = '#111827'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+      ctx.fillText(member.hoTen, 225, 435);
+      ctx.fillStyle = '#4b5563'; ctx.font = 'bold 20px monospace';
+      ctx.fillText(member.ma, 225, 475);
+      resolve(canvas);
+    }, 100);
+  });
+}
+
+function downloadCurrentQR() {
+  if (!qrCurrentCanvas) return;
+  const a = document.createElement('a'); a.href = qrCurrentCanvas.toDataURL('image/png'); a.download = 'QR_CaVien.png'; a.click();
+}
+
+function printList() { window.print(); }
+function exportCSV() {
+  const list = getFilteredMembers();
+  if (!list.length) return alert('Không có dữ liệu.');
+  let csv = '\uFEFFSTT,Mã,Họ tên,SĐT,Bè,Trạng thái,Thời gian\n';
+  list.forEach((m, i) => {
+    const st = m.daDiemDanh ? 'Có mặt' : (m.vang ? 'Vắng ' + m.loaiVang : 'Chưa có mặt');
+    csv += `"${i + 1}","${m.ma}","${m.hoTen}","${m.sdt}","${m.be}","${st}","${m.thoiGian}"\n`;
+  });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); a.download = 'diem_danh.csv'; a.click();
+}
+
+function showTableMessage(text) { document.getElementById('tableWrap').innerHTML = `<div class="empty">${escapeHtml(text)}</div>`; }
+function goHome() { window.location.href = '../index.html'; }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c])); }
+function escapeJs(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+if (adminPassword) {
+  document.getElementById('adminPassword').value = adminPassword;
+  loginAdmin();
+}
+</script>
+</body>
+</html>
