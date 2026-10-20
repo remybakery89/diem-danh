@@ -134,8 +134,7 @@
     .modal-box h2 { margin-bottom: 8px; }
     .modal-box p { color: #6b7280; line-height: 1.5; }
     .modal-box button { margin-top: 8px; }
-    
-    /* Box chọn loại chương trình */
+
     .type-select-box {
       background: #f8fafc;
       border: 2px solid #e2e8f0;
@@ -188,7 +187,6 @@
 
     <div class="card">
       <form id="form">
-        <!-- CHỌN LOẠI CHƯƠNG TRÌNH -->
         <div class="type-select-box">
           <label for="loaiBuoi">Loại chương trình *</label>
           <select id="loaiBuoi" onchange="toggleFormMode()">
@@ -214,7 +212,6 @@
             <input id="gio" type="time" required value="19:30">
           </div>
 
-          <!-- KHU VỰC CHI TIẾT SỰ KIỆN: SẼ TỰ ĐỘNG ẨN KHI LÀ TẬP HÁT -->
           <div class="full event-field" style="display:none; border-top:1px dashed #e5e7eb; margin: 6px 0;"></div>
 
           <div class="event-field" style="display:none">
@@ -260,18 +257,19 @@
             </select>
           </div>
 
+          <!-- MỤC PHƯƠNG TIỆN CẬP NHẬT: KHÔNG ÁP DỤNG / ÁP DỤNG -->
           <div class="event-field" style="display:none">
-            <label>Phương tiện</label>
-            <select id="phuongTien">
-              <option value="KHÔNG ÁP DỤNG">KHÔNG ÁP DỤNG</option>
-              <option value="XE CHUNG">XE CHUNG</option>
-              <option value="XE RIÊNG">XE RIÊNG</option>
+            <label>Phương tiện đưa đón</label>
+            <select id="phuongTien" onchange="togglePickup()">
+              <option value="KHÔNG ÁP DỤNG">KHÔNG ÁP DỤNG (Tự túc)</option>
+              <option value="ÁP DỤNG">ÁP DỤNG (Có xe chung & xe riêng)</option>
             </select>
           </div>
 
           <div id="pickupWrap" class="pickup event-field">
-            <label>Điểm đón</label>
-            <input id="diemDon" placeholder="Nhập các điểm đón, cách nhau bằng dấu phẩy">
+            <label>Điểm đón xe chung *</label>
+            <input id="diemDon" placeholder="Ví dụ: Cây xăng Hàng Xanh, Nhà thờ Đồng Tiến...">
+            <div class="hint">Nhập các điểm đón xe đoàn đón ca viên, cách nhau bằng dấu phẩy. Ca viên đi xe riêng sẽ không cần chọn điểm đón.</div>
           </div>
 
           <div class="full event-field" style="display:none">
@@ -317,7 +315,7 @@ function jsonp(params) {
     function cleanup() {
       clearTimeout(timer);
       delete window[cb];
-      script.remove();
+      if (script.parentNode) script.remove();
     }
 
     window[cb] = d => {
@@ -381,14 +379,28 @@ function toggleFormMode() {
   }
 }
 
+function togglePickup() {
+  const val = document.getElementById('phuongTien').value;
+  const isApplied = val === 'ÁP DỤNG' || val === 'XE CHUNG';
+  const wrap = document.getElementById('pickupWrap');
+  wrap.style.display = isApplied ? 'block' : 'none';
+  document.getElementById('diemDon').required = isApplied;
+}
+
 async function login() {
-  const p = document.getElementById('password').value;
+  const inputEl = document.getElementById('password');
+  const p = (inputEl.value || '').trim();
   if (!p) return msg('Vui lòng nhập mật khẩu.');
-  document.getElementById('loginBtn').disabled = true;
+
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Đang kiểm tra...';
+
   try {
     const r = await jsonp({ api: 'registration_admin', password: p });
     if (!r.success) {
       msg(r.message || 'Mật khẩu không đúng.');
+      sessionStorage.removeItem('adminRegistrationPassword');
       return;
     }
     password = p;
@@ -398,9 +410,10 @@ async function login() {
     await loadPrograms();
     if (editCode) await loadEdit();
   } catch (e) {
-    msg(e.message);
+    msg('Lỗi kết nối: ' + e.message);
   } finally {
-    document.getElementById('loginBtn').disabled = false;
+    btn.disabled = false;
+    btn.textContent = 'Đăng nhập';
   }
 }
 
@@ -453,8 +466,7 @@ async function loadEdit() {
     return;
   }
   const p = r.program;
-  
-  // Tự động nhận diện loại buổi khi chỉnh sửa
+
   const isTapHat = /tập hát|tap hat/i.test(p.tenBuoi || '');
   document.getElementById('loaiBuoi').value = isTapHat ? 'TAP_HAT' : 'SU_KIEN';
   toggleFormMode();
@@ -462,11 +474,15 @@ async function loadEdit() {
   ['tenBuoi', 'diaDiem', 'ngay', 'gio', 'moDangKy', 'hanChot', 'gioiHan', 'ghiChu', 'diemDon'].forEach(k => {
     if (document.getElementById(k)) document.getElementById(k).value = p[k] || '';
   });
-  
+
   document.getElementById('doiTuong').value = p.doiTuong || 'TẤT CẢ';
   document.getElementById('cheDoDangKy').value = p.cheDoDangKy || 'AUTO';
-  document.getElementById('phuongTien').value = p.phuongTien || 'KHÔNG ÁP DỤNG';
+
+  // Nhận diện trạng thái phương tiện
+  const rawPt = (p.phuongTien || '').trim().toUpperCase();
+  document.getElementById('phuongTien').value = (rawPt === 'ÁP DỤNG' || rawPt === 'XE CHUNG' || rawPt === 'XE RIÊNG') ? 'ÁP DỤNG' : 'KHÔNG ÁP DỤNG';
   togglePickup();
+
   document.getElementById('title').textContent = 'Chỉnh sửa chương trình';
   document.getElementById('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -475,6 +491,7 @@ async function save(e) {
   e.preventDefault();
   const loai = document.getElementById('loaiBuoi').value;
   const isTapHat = loai === 'TAP_HAT';
+  const phuongTienVal = isTapHat ? 'KHÔNG ÁP DỤNG' : document.getElementById('phuongTien').value;
 
   const payload = {
     maBuoi: editCode,
@@ -488,8 +505,8 @@ async function save(e) {
     doiTuong: isTapHat ? 'TẤT CẢ' : document.getElementById('doiTuong').value,
     ghiChu: isTapHat ? '' : document.getElementById('ghiChu').value.trim(),
     cheDoDangKy: isTapHat ? 'AUTO' : document.getElementById('cheDoDangKy').value,
-    phuongTien: isTapHat ? 'KHÔNG ÁP DỤNG' : document.getElementById('phuongTien').value,
-    diemDon: isTapHat ? '' : document.getElementById('diemDon').value.trim()
+    phuongTien: phuongTienVal,
+    diemDon: (isTapHat || phuongTienVal === 'KHÔNG ÁP DỤNG') ? '' : document.getElementById('diemDon').value.trim()
   };
 
   const wasEditing = !!editCode;
@@ -524,7 +541,7 @@ function resetForm() {
   document.getElementById('form').reset();
   document.getElementById('loaiBuoi').value = 'TAP_HAT';
   document.getElementById('tenBuoi').value = 'Tập hát thường kỳ';
-  document.getElementById('gio').value = '19:30';
+  document.getElementById('gio').value = '19:00';
   document.getElementById('cheDoDangKy').value = 'AUTO';
   document.getElementById('phuongTien').value = 'KHÔNG ÁP DỤNG';
   toggleFormMode();
@@ -534,14 +551,6 @@ function resetForm() {
   document.getElementById('title').textContent = 'Tạo chương trình';
 }
 
-function togglePickup() {
-  const isShared = document.getElementById('phuongTien').value === 'XE CHUNG';
-  const wrap = document.getElementById('pickupWrap');
-  wrap.style.display = isShared ? 'block' : 'none';
-  document.getElementById('diemDon').required = isShared;
-}
-
-document.getElementById('phuongTien').onchange = togglePickup;
 document.getElementById('loginBtn').onclick = login;
 document.getElementById('password').onkeydown = e => { if (e.key === 'Enter') login(); };
 document.getElementById('form').onsubmit = save;
