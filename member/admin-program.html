@@ -15,7 +15,7 @@
 <div class="card"><div class="table-wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Bè</th><th>Đăng ký</th><th>Điểm danh</th><th>Phương thức</th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </div></div>
 <script>
-const API='https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
+const API = 'https://diem-danh-api.remybakery89.workers.dev';
 let password=sessionStorage.getItem('adminRegistrationPassword')||'';let dataRows=[];let program=null;
 const params=new URLSearchParams(location.search);const maBuoi=params.get('maBuoi')||sessionStorage.getItem('adminSelectedProgram')||'';
 function esc(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[c]))}
