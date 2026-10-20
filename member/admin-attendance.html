@@ -488,23 +488,76 @@ async function createSelectedQR(batch) {
   }
 }
 
+// Đường dẫn file ảnh phôi template trên GitHub của bạn
+const QR_TEMPLATE_URL = 'template-qr.png'; // hoặc '../template-qr.png' tùy vị trí đặt ảnh
+
 function generateQRCanvas(member) {
-  return new Promise(resolve => {
-    const div = document.createElement('div');
-    new QRCode(div, { text: member.ma, width: 350, height: 350, correctLevel: QRCode.CorrectLevel.H });
-    setTimeout(() => {
-      const qrImg = div.querySelector('canvas') || div.querySelector('img');
+  return new Promise(async (resolve, reject) => {
+    try {
+      // 1. Tải ảnh phôi thẻ
+      const template = new Image();
+      template.crossOrigin = 'anonymous';
+      template.src = QR_TEMPLATE_URL;
+
+      await new Promise((res, rej) => {
+        template.onload = res;
+        template.onerror = () => rej(new Error('Không tải được file ảnh template-qr.png'));
+      });
+
+      // 2. Tạo Canvas theo đúng kích thước phôi gốc (1080 x 1350)
       const canvas = document.createElement('canvas');
-      canvas.width = 450; canvas.height = 530;
+      canvas.width = template.naturalWidth || 1080;
+      canvas.height = template.naturalHeight || 1350;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 450, 530);
-      ctx.drawImage(qrImg, 50, 40, 350, 350);
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
-      ctx.fillText(member.hoTen, 225, 435);
-      ctx.fillStyle = '#4b5563'; ctx.font = 'bold 20px monospace';
-      ctx.fillText(member.ma, 225, 475);
-      resolve(canvas);
-    }, 100);
+
+      // Vẽ hình nền template
+      ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
+
+      // Tỷ lệ scale nếu kích thước ảnh khác 1080x1350
+      const scaleX = canvas.width / 1080;
+      const scaleY = canvas.height / 1350;
+      const qrX = 305 * scaleX;
+      const qrY = 696.4 * scaleY;
+      const qrSize = 470 * scaleX;
+
+      // 3. Tạo mã QR từ mã cá nhân
+      const div = document.createElement('div');
+      div.style.position = 'fixed';
+      div.style.left = '-99999px';
+      document.body.appendChild(div);
+
+      new QRCode(div, {
+        text: member.ma,
+        width: Math.round(qrSize),
+        height: Math.round(qrSize),
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      // Chờ thư viện vẽ QR xong
+      setTimeout(() => {
+        const qrEl = div.querySelector('canvas') || div.querySelector('img');
+        if (qrEl) {
+          ctx.drawImage(qrEl, qrX, qrY, qrSize, qrSize);
+        }
+        div.remove();
+
+        // 4. In mã chữ bên dưới (màu nâu đậm #6b4527 như bản gốc)
+        const codeX = 540 * scaleX;
+        const codeY = 1260.1 * scaleY;
+        ctx.save();
+        ctx.fillStyle = '#6b4527';
+        ctx.font = 'bold ' + (48.8 * scaleX) + 'px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(member.ma, codeX, codeY);
+        ctx.restore();
+
+        resolve(canvas);
+      }, 80);
+
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
