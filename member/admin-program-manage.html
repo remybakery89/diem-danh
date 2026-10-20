@@ -64,6 +64,10 @@
       background: #e5e7eb;
       color: #111827;
     }
+    button.danger {
+      background: #dc2626;
+      color: #fff;
+    }
     .top {
       display: flex;
       justify-content: space-between;
@@ -103,7 +107,16 @@
     }
     .program-item h3 { margin: 0 0 5px; }
     .program-item p { margin: 3px 0; font-size: 13px; color: #6b7280; }
-    .program-item button { width: auto; min-width: 100px; }
+    .item-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .item-buttons button {
+      width: auto;
+      min-width: 80px;
+      padding: 8px 12px;
+      min-height: 38px;
+    }
     .status { font-weight: 700; }
     .status-open { color: #15803d; }
     .status-closed { color: #b91c1c; }
@@ -152,7 +165,8 @@
       .grid { grid-template-columns: 1fr; }
       .actions { flex-direction: column; }
       .program-item { align-items: stretch; flex-direction: column; }
-      .program-item button { width: 100%; }
+      .item-buttons { width: 100%; }
+      .item-buttons button { flex: 1; }
     }
   </style>
 </head>
@@ -257,7 +271,6 @@
             </select>
           </div>
 
-          <!-- MỤC PHƯƠNG TIỆN CẬP NHẬT: KHÔNG ÁP DỤNG / ÁP DỤNG -->
           <div class="event-field" style="display:none">
             <label>Phương tiện đưa đón</label>
             <select id="phuongTien" onchange="togglePickup()">
@@ -281,6 +294,7 @@
         <div class="actions" style="margin-top:14px">
           <button type="submit" id="saveBtn">Lưu chương trình</button>
           <button type="button" class="secondary" onclick="resetForm()">Tạo mới</button>
+          <button type="button" class="danger hidden" id="deleteBtn" onclick="deleteCurrentProgram()">Xóa buổi này</button>
         </div>
       </form>
     </div>
@@ -444,7 +458,10 @@ function renderProgramList() {
         <p>${esc(p.maBuoi)} · ${esc(p.ngay)}${p.gio ? ' · ' + esc(p.gio) : ''}${p.diaDiem ? ' · ' + esc(p.diaDiem) : ''}</p>
         <p>${statusHtml(p)} · ${p.cheDoDangKy === 'CLOSED' ? 'ĐÓNG THỦ CÔNG' : 'MỞ TỰ ĐỘNG'}</p>
       </div>
-      <button onclick="editProgram('${encodeURIComponent(p.maBuoi)}')">Chỉnh sửa</button>
+      <div class="item-buttons">
+        <button onclick="editProgram('${encodeURIComponent(p.maBuoi)}')">Sửa</button>
+        <button class="danger" onclick="deleteProgram('${encodeURIComponent(p.maBuoi)}', '${esc(p.tenBuoi)}')">Xóa</button>
+      </div>
     </div>
   `).join('') : '<p class="muted">Không tìm thấy chương trình.</p>';
 }
@@ -453,6 +470,40 @@ function editProgram(encoded) {
   editCode = decodeURIComponent(encoded);
   history.replaceState({}, '', location.pathname + '?maBuoi=' + encodeURIComponent(editCode));
   loadEdit();
+}
+
+async function deleteProgram(encoded, name) {
+  const code = decodeURIComponent(encoded);
+  if (!confirm(`Bạn có chắc chắn muốn XÓA chương trình "${name || code}"?\n\nLưu ý: Thao tác này sẽ xóa buổi và toàn bộ dữ liệu điểm danh/đăng ký của buổi này!`)) {
+    return;
+  }
+
+  try {
+    const r = await jsonp({
+      api: 'admin_program_delete',
+      password: password,
+      maBuoi: code
+    });
+
+    if (!r.success) {
+      alert('Không xóa được: ' + (r.message || 'Lỗi không xác định'));
+      return;
+    }
+
+    if (editCode === code) {
+      resetForm();
+    }
+    await loadPrograms();
+    showModal('Đã xóa', `Đã xóa thành công chương trình: ${code}`);
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
+}
+
+function deleteCurrentProgram() {
+  if (!editCode) return;
+  const name = document.getElementById('tenBuoi').value;
+  deleteProgram(encodeURIComponent(editCode), name);
 }
 
 function esc(s) {
@@ -478,11 +529,11 @@ async function loadEdit() {
   document.getElementById('doiTuong').value = p.doiTuong || 'TẤT CẢ';
   document.getElementById('cheDoDangKy').value = p.cheDoDangKy || 'AUTO';
 
-  // Nhận diện trạng thái phương tiện
   const rawPt = (p.phuongTien || '').trim().toUpperCase();
   document.getElementById('phuongTien').value = (rawPt === 'ÁP DỤNG' || rawPt === 'XE CHUNG' || rawPt === 'XE RIÊNG') ? 'ÁP DỤNG' : 'KHÔNG ÁP DỤNG';
   togglePickup();
 
+  document.getElementById('deleteBtn').classList.remove('hidden');
   document.getElementById('title').textContent = 'Chỉnh sửa chương trình';
   document.getElementById('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -526,6 +577,7 @@ async function save(e) {
     }
     editCode = r.maBuoi;
     history.replaceState({}, '', location.pathname + '?maBuoi=' + encodeURIComponent(editCode));
+    document.getElementById('deleteBtn').classList.remove('hidden');
     document.getElementById('title').textContent = 'Chỉnh sửa chương trình';
     await loadPrograms();
     showModal(wasEditing ? 'Đã cập nhật chương trình' : 'Đã tạo chương trình', `Mã chương trình: ${r.maBuoi}`);
@@ -541,12 +593,13 @@ function resetForm() {
   document.getElementById('form').reset();
   document.getElementById('loaiBuoi').value = 'TAP_HAT';
   document.getElementById('tenBuoi').value = 'Tập hát thường kỳ';
-  document.getElementById('gio').value = '19:00';
+  document.getElementById('gio').value = '19:30';
   document.getElementById('cheDoDangKy').value = 'AUTO';
   document.getElementById('phuongTien').value = 'KHÔNG ÁP DỤNG';
   toggleFormMode();
   togglePickup();
   editCode = '';
+  document.getElementById('deleteBtn').classList.add('hidden');
   history.replaceState({}, '', location.pathname);
   document.getElementById('title').textContent = 'Tạo chương trình';
 }
