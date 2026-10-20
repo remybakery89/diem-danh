@@ -16,7 +16,7 @@
 <div class="card"><div class="table-wrap"><table><thead><tr><th>Ca viên</th><th>Trạng thái</th><th>Yêu cầu</th><th>Lý do</th><th>Cập nhật / duyệt</th><th>Thao tác</th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </div></div>
 <script>
-const API='https://script.google.com/macros/s/AKfycbw3vjfqpTIB5U8Kqij9Fa1FtR7RFA-QAreYjl0wBrVkWjGQL6QOyCdP-NtPgwi78lmdHA/exec';
+const API = 'https://diem-danh-api.remybakery89.workers.dev';
 let password=sessionStorage.getItem('adminRegistrationPasswordV5')||'',rows=[],programs=[];
 function esc(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[c]))}
 function jsonp(params){return new Promise((resolve,reject)=>{const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),q=new URLSearchParams({...params,callback:cb}),timer=setTimeout(()=>{cleanup();reject(new Error('Kết nối máy chủ quá lâu.'))},15000);function cleanup(){clearTimeout(timer);delete window[cb];script.remove()}window[cb]=d=>{cleanup();resolve(d)};script.onerror=()=>{cleanup();reject(new Error('Không kết nối được máy chủ.'))};script.src=API+'?'+q;document.body.appendChild(script)})}
