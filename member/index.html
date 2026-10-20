@@ -327,6 +327,63 @@ async function cancelProgram(encoded){
   }
 }
 
+async function loadMine(){
+  const r = await jsonp({api: 'registration_v5_mine', token});
+  if(!r.success){
+    if(r.type === 'SESSION_EXPIRED'){ logout(); return; }
+    throw new Error(r.message || 'Không tải được đăng ký.');
+  }
+  currentMine = r.registrations || [];
+  document.getElementById('mine').innerHTML = currentMine.length
+    ? currentMine.map(x => `
+        <div class="program">
+          <b>${esc(x.tenBuoi || x.maBuoi)}</b>
+          <p class="muted small">${esc(x.ngay || '')}${x.gio ? ' · ' + esc(x.gio) : ''}</p>
+          <p><span class="${x.trangThai === 'ĐI' ? 'ok' : 'warn'}">● ${esc(x.trangThai)}</span></p>
+          ${(x.trangThai === 'ĐI' || x.trangThai === 'DỰ BỊ' || x.trangThai === 'CHỜ DUYỆT') ? `<button class="danger" onclick="cancelProgram('${encodeURIComponent(x.maBuoi)}')">Hủy đăng ký</button>` : ''}
+        </div>
+      `).join('')
+    : '<p class="muted">Bạn chưa có đăng ký nào.</p>';
+}
+
+async function registerProgram(encoded){
+  const maBuoi = decodeURIComponent(encoded);
+  if(!confirm('Xác nhận đăng ký tham gia chương trình này?')) return;
+  try{
+    const r = await jsonp({
+      api: 'registration_v5_submit',
+      token,
+      maBuoi,
+      trangThai: 'ĐI',
+      lyDo: ''
+    });
+    if(!r.success){ alert(r.message || 'Không đăng ký được.'); return; }
+    alert(r.message || 'Đăng ký thành công.');
+    await refreshAll();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+async function cancelProgram(encoded){
+  const maBuoi = decodeURIComponent(encoded);
+  const lyDo = prompt('Vui lòng nhập lý do hủy đăng ký:') || '';
+  if(!confirm('Bạn có chắc muốn hủy đăng ký chương trình này?')) return;
+  try{
+    const r = await jsonp({
+      api: 'registration_v5_cancel',
+      token,
+      maBuoi,
+      lyDo: lyDo
+    });
+    if(!r.success){ alert(r.message || 'Không thể hủy đăng ký.'); return; }
+    alert(r.message || 'Đã hủy đăng ký.');
+    await refreshAll();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
 window.registerProgram=registerProgram;
 window.cancelProgram=cancelProgram;
 document.getElementById('loginBtn').onclick=login;
