@@ -155,35 +155,6 @@
     .qr-code-txt { font-family: monospace; font-size: 22px; font-weight: 800; color: #1967d2; letter-spacing: 1px; }
     .qr-hint { color: #65676b; font-size: 13px; margin-top: 8px; }
 
-          <!-- TAB: SINH NHẬT & BỔN MẠNG (TT & SH) -->
-      <div id="tabCelebrations" class="tab-pane">
-        <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
-          <div style="font-weight:700; margin-bottom:10px; font-size:16px;">🎂 Lễ Bổn Mạng & Sinh Nhật</div>
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <select id="celebMonthSelect" class="input-field" style="height:40px;" onchange="renderCelebrations()">
-              <option value="CUR">Tháng hiện tại</option>
-              <option value="NEXT">Tháng kế tiếp</option>
-            </select>
-            <select id="celebTypeSelect" class="input-field" style="height:40px;" onchange="renderCelebrations()">
-              <option value="ALL">Tất cả</option>
-              <option value="BON_MANG">Chỉ Bổn Mạng</option>
-              <option value="SINH_NHAT">Chỉ Sinh Nhật</option>
-            </select>
-          </div>
-          <div id="celebListWrap"><div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp dữ liệu...</div></div>
-        </div>
-      </div>
-
-      <!-- TAB: DANH BẠ HẬU CẦN -->
-      <div id="tabLogistics" class="tab-pane">
-        <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
-          <div style="font-weight:700; margin-bottom:10px; font-size:16px;">📞 Danh Bạ Ca Viên (Hậu Cần)</div>
-          <input type="text" id="logisticsSearch" class="input-field" style="height:40px; margin-bottom:10px;" placeholder="🔎 Tìm tên hoặc số điện thoại..." oninput="renderLogisticsList()">
-          <div id="logisticsListWrap"><div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp danh bạ...</div></div>
-        </div>
-      </div>
-
-    
     /* Danh sách chương trình */
     .program-card {
       background: #fff;
@@ -230,22 +201,13 @@
       display: flex;
       border-top: 1px solid #e4e6eb;
       z-index: 90;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
-
-          <!-- Tab Bổn mạng/Sinh nhật cho Ban TT & SH -->
-      <div id="navCelebrations" class="nav-item" style="display:none;" onclick="switchTab('tabCelebrations', this)">
-        <span class="icon">🎂</span>
-        <span>Sinh nhật</span>
-      </div>
-
-      <!-- Tab Danh bạ cho Ban Hậu Cần -->
-      <div id="navLogistics" class="nav-item" style="display:none;" onclick="switchTab('tabLogistics', this)">
-        <span class="icon">📞</span>
-        <span>Hậu cần</span>
-      </div>
-
+    .bottom-nav::-webkit-scrollbar { display: none; }
     .nav-item {
       flex: 1;
+      min-width: 65px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -257,7 +219,7 @@
       gap: 3px;
     }
     .nav-item.active { color: #1967d2; font-weight: 700; }
-    .nav-item span.icon { font-size: 20px; }
+    .nav-item span.icon { font-size: 19px; }
 
     /* Modal phóng to QR */
     .modal {
@@ -339,7 +301,7 @@
         </div>
       </div>
 
-      <!-- TAB 2: ĐĂNG KÝ SỰ KIỆN (V5) -->
+      <!-- TAB 2: ĐĂNG KÝ SỰ KIỆN -->
       <div id="tabEvents" class="tab-pane">
         <div id="programList">
           <div style="text-align:center; padding:30px; color:#65676b;">Đang tải danh sách chương trình...</div>
@@ -350,6 +312,34 @@
       <div id="tabHistory" class="tab-pane">
         <div id="myRegistrations">
           <div style="text-align:center; padding:30px; color:#65676b;">Đang tải lịch sử đăng ký...</div>
+        </div>
+      </div>
+
+      <!-- TAB 4: BỔN MẠNG & SINH NHẬT (Chỉ Trưởng/Phó Ban TT & SH) -->
+      <div id="tabCelebrations" class="tab-pane">
+        <div style="background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+          <div style="font-weight:700; margin-bottom:10px; font-size:16px; color:#1967d2;">🎂 Lễ Bổn Mạng & Sinh Nhật</div>
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <select id="celebMonthSelect" class="input-field" style="height:40px; font-size:14px;" onchange="renderCelebrations()">
+              <option value="CUR">Tháng này</option>
+              <option value="NEXT">Tháng tới</option>
+            </select>
+            <select id="celebTypeSelect" class="input-field" style="height:40px; font-size:14px;" onchange="renderCelebrations()">
+              <option value="ALL">Tất cả</option>
+              <option value="BON_MANG">Chỉ Bổn Mạng</option>
+              <option value="SINH_NHAT">Chỉ Sinh Nhật</option>
+            </select>
+          </div>
+          <div id="celebListWrap"><div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp dữ liệu...</div></div>
+        </div>
+      </div>
+
+      <!-- TAB 5: DANH BẠ HẬU CẦN (Chỉ Trưởng/Phó Ban Hậu Cần) -->
+      <div id="tabLogistics" class="tab-pane">
+        <div style="background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+          <div style="font-weight:700; margin-bottom:10px; font-size:16px; color:#1967d2;">📞 Danh Bạ Ca Viên (Hậu Cần)</div>
+          <input type="text" id="logisticsSearch" class="input-field" style="height:40px; margin-bottom:10px; font-size:14px;" placeholder="🔎 Tìm tên hoặc số điện thoại..." oninput="renderLogisticsList()">
+          <div id="logisticsListWrap"><div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp danh bạ...</div></div>
         </div>
       </div>
     </div>
@@ -367,6 +357,16 @@
       <div class="nav-item" onclick="switchTab('tabHistory', this)">
         <span class="icon">📝</span>
         <span>Đã đăng ký</span>
+      </div>
+
+      <!-- 2 Tab phân quyền (mặc định ẩn) -->
+      <div id="navCelebrations" class="nav-item" style="display:none;" onclick="switchTab('tabCelebrations', this)">
+        <span class="icon">🎂</span>
+        <span>Sinh nhật</span>
+      </div>
+      <div id="navLogistics" class="nav-item" style="display:none;" onclick="switchTab('tabLogistics', this)">
+        <span class="icon">📞</span>
+        <span>Hậu cần</span>
       </div>
     </div>
   </div>
@@ -430,7 +430,6 @@ window.addEventListener('offline', updateNetworkStatus);
 /* KHỞI ĐỘNG */
 window.addEventListener('load', () => {
   updateNetworkStatus();
-  // Đọc dữ liệu đã lưu cache offline từ máy
   const cachedUser = localStorage.getItem('scyc_member_user');
   if (cachedUser) {
     try {
@@ -460,10 +459,21 @@ function showApp() {
   document.getElementById('avatarTxt').textContent = currentUser.hoTen.substring(0, 2).toUpperCase();
   document.getElementById('displayCode').textContent = currentUser.ma;
 
-  // Vẽ mã QR từ bộ nhớ máy (Không cần mạng vẫn vẽ nét)
+  // Vẽ mã QR từ bộ nhớ máy
   drawQR(currentUser.ma);
 
-  // Nếu có mạng thì tải thêm danh sách chương trình
+  // PHÂN QUYỀN HIỂN THỊ MENU TAB
+  const role = (currentUser.vaiTro || '').toLowerCase();
+  
+  // Quyền Ban Truyền Thông & Ban Sinh Hoạt
+  const canSeeCeleb = (role.includes('truyền thông') || role.includes('sinh hoạt')) && (role.includes('trưởng') || role.includes('phó')) || role.includes('ca trưởng') || role.includes('thư ký');
+  document.getElementById('navCelebrations').style.display = canSeeCeleb ? 'flex' : 'none';
+
+  // Quyền Ban Hậu Cần
+  const canSeeLogistics = role.includes('hậu cần') && (role.includes('trưởng') || role.includes('phó')) || role.includes('ca trưởng') || role.includes('thư ký');
+  document.getElementById('navLogistics').style.display = canSeeLogistics ? 'flex' : 'none';
+
+  // Nếu có mạng thì tải thêm dữ liệu sự kiện
   if (navigator.onLine) {
     loadPrograms();
     loadMyRegistrations();
@@ -528,7 +538,6 @@ async function handleLogin() {
     }
 
     currentUser = res.member;
-    // Lưu vào máy để dùng offline vĩnh viễn
     localStorage.setItem('scyc_member_user', JSON.stringify(currentUser));
     showApp();
   } catch (err) {
@@ -559,9 +568,11 @@ function switchTab(tabId, el) {
 
   if (tabId === 'tabEvents' && navigator.onLine) loadPrograms();
   if (tabId === 'tabHistory' && navigator.onLine) loadMyRegistrations();
+  if (tabId === 'tabCelebrations' && navigator.onLine) loadCelebrations();
+  if (tabId === 'tabLogistics' && navigator.onLine) loadLogistics();
 }
 
-/* TẢI CHƯƠNG TRÌNH & ĐĂNG KÝ (V5) */
+/* TẢI CHƯƠNG TRÌNH & ĐĂNG KÝ */
 async function loadPrograms() {
   const box = document.getElementById('programList');
   box.innerHTML = '<div style="text-align:center; padding:30px; color:#65676b;">Đang tải chương trình...</div>';
@@ -646,6 +657,114 @@ async function cancelRegister(maBuoi) {
   } catch(e) {
     alert(e.message || 'Không thể hủy.');
   }
+}
+
+/* ==================== BAN TRUYỀN THÔNG & SINH HOẠT ==================== */
+let rawCelebrations = [];
+async function loadCelebrations() {
+  const wrap = document.getElementById('celebListWrap');
+  wrap.innerHTML = '<div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp dữ liệu...</div>';
+  try {
+    const res = await jsonp({ api: 'member_get_celebrations', token: currentUser.ma });
+    if (!res.success) { wrap.innerHTML = `<div style="color:#dc2626; padding:15px;">${res.message}</div>`; return; }
+    rawCelebrations = res.list || [];
+    renderCelebrations();
+  } catch(e) { wrap.innerHTML = `<div style="color:#dc2626; padding:15px;">${e.message}</div>`; }
+}
+
+function renderCelebrations() {
+  const mode = document.getElementById('celebMonthSelect').value;
+  const type = document.getElementById('celebTypeSelect').value;
+  const wrap = document.getElementById('celebListWrap');
+
+  const now = new Date();
+  let targetMonth = now.getMonth() + 1; // 1 - 12
+  if (mode === 'NEXT') targetMonth = targetMonth === 12 ? 1 : targetMonth + 1;
+
+  const filtered = [];
+
+  rawCelebrations.forEach(m => {
+    // Tách tháng sinh
+    let birthMonth = null;
+    if (m.ngay_sinh) {
+      const parts = m.ngay_sinh.includes('-') ? m.ngay_sinh.split('-') : m.ngay_sinh.split('/');
+      // Hỗ trợ YYYY-MM-DD hoặc DD/MM/YYYY
+      birthMonth = parts.length >= 2 ? parseInt(m.ngay_sinh.includes('-') ? parts[1] : parts[1], 10) : null;
+    }
+
+    // Tách tháng bổn mạng
+    let feastMonth = null;
+    if (m.ngay_bon_mang) {
+      const parts = m.ngay_bon_mang.includes('-') ? m.ngay_bon_mang.split('-') : m.ngay_bon_mang.split('/');
+      // Hỗ trợ DD/MM hoặc MM/DD
+      feastMonth = parts.length >= 2 ? parseInt(parts[1] || parts[0], 10) : null;
+    }
+
+    const matchBirth = (birthMonth === targetMonth);
+    const matchFeast = (feastMonth === targetMonth);
+
+    if (type === 'ALL' && (matchBirth || matchFeast)) {
+      filtered.push({ ...m, matchBirth, matchFeast });
+    } else if (type === 'SINH_NHAT' && matchBirth) {
+      filtered.push({ ...m, matchBirth: true, matchFeast: false });
+    } else if (type === 'BON_MANG' && matchFeast) {
+      filtered.push({ ...m, matchBirth: false, matchFeast: true });
+    }
+  });
+
+  if (!filtered.length) {
+    wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#6b7280;">Không có ngày lễ/sinh nhật trong tháng ${targetMonth}.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = filtered.map(item => `
+    <div style="border-bottom:1px solid #f0f2f5; padding:10px 0; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:700;">${escapeHtml(item.ho_ten)}</div>
+        <div style="font-size:12px; color:#6b7280;">Bè ${escapeHtml(item.be)}</div>
+      </div>
+      <div style="text-align:right; font-size:13px;">
+        ${item.matchFeast ? `<div style="color:#166534; font-weight:600;">🌿 Bổn mạng: ${escapeHtml(item.ngay_bon_mang)}</div>` : ''}
+        ${item.matchBirth ? `<div style="color:#b45309; font-weight:600;">🎂 Sinh nhật: ${escapeHtml(item.ngay_sinh)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ==================== BAN HẬU CẦN ==================== */
+let rawLogistics = [];
+async function loadLogistics() {
+  const wrap = document.getElementById('logisticsListWrap');
+  wrap.innerHTML = '<div style="text-align:center; padding:20px; color:#6b7280;">Đang nạp danh bạ...</div>';
+  try {
+    const res = await jsonp({ api: 'member_get_logistics_contacts', token: currentUser.ma });
+    if (!res.success) { wrap.innerHTML = `<div style="color:#dc2626; padding:15px;">${res.message}</div>`; return; }
+    rawLogistics = res.list || [];
+    renderLogisticsList();
+  } catch(e) { wrap.innerHTML = `<div style="color:#dc2626; padding:15px;">${e.message}</div>`; }
+}
+
+function renderLogisticsList() {
+  const q = (document.getElementById('logisticsSearch').value || '').trim().toLowerCase();
+  const wrap = document.getElementById('logisticsListWrap');
+
+  const filtered = rawLogistics.filter(m => !q || m.ho_ten.toLowerCase().includes(q) || (m.sdt && m.sdt.includes(q)));
+  if (!filtered.length) {
+    wrap.innerHTML = '<div style="text-align:center; padding:20px; color:#6b7280;">Không tìm thấy ca viên.</div>';
+    return;
+  }
+
+  wrap.innerHTML = filtered.map(m => `
+    <div style="border-bottom:1px solid #f0f2f5; padding:10px 0; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:700;">${escapeHtml(m.ho_ten)}</div>
+        <div style="font-size:12px; color:#6b7280;">Bè ${escapeHtml(m.be)} ${m.vai_tro ? '• ' + escapeHtml(m.vai_tro) : ''}</div>
+      </div>
+      <div>
+        <a href="tel:${m.sdt}" style="display:inline-block; background:#eaf2ff; color:#1967d2; font-weight:700; padding:6px 12px; border-radius:8px; text-decoration:none; font-size:13px;">📞 ${m.sdt || 'Chưa có'}</a>
+      </div>
+    </div>
+  `).join('');
 }
 
 function escapeHtml(s) {
