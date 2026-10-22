@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bàn Quản Trị - SCYC</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1967d2;
+      --bg: #f3f4f6;
+      --text: #111827;
+      --card: #ffffff;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); font-family: system-ui, -apple-system, sans-serif; color: var(--text); }
+    .wrap { max-width: 1100px; margin: auto; padding: 16px 12px 60px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.04); }
+    h1, h2, h3, p { margin-top: 0; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .hidden { display: none !important; }
+
+    /* Màn hình đăng nhập */
+    .login-box { max-width: 400px; margin: 60px auto; background: #fff; border-radius: 20px; padding: 26px; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+    .login-icon { font-size: 48px; margin-bottom: 6px; }
+
+    /* Thanh Header & Menu Tab */
+    .admin-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .nav-tabs { display: flex; gap: 8px; background: #e5e7eb; padding: 4px; border-radius: 12px; overflow-x: auto; margin-bottom: 16px; }
+    .tab-btn { flex: 1; min-width: 120px; border: 0; background: transparent; padding: 10px; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; color: #4b5563; text-align: center; white-space: nowrap; }
+    .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+
+    /* Form & Input */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .full { grid-column: 1/-1; }
+    label { display: block; font-weight: 650; margin-bottom: 4px; font-size: 14px; }
+    input, select, textarea, button { width: 100%; min-height: 44px; border-radius: 10px; font: inherit; }
+    input, select, textarea { border: 1px solid #d1d5db; padding: 8px 12px; background: #fff; }
+    button { border: 0; background: var(--text); color: #fff; font-weight: 700; cursor: pointer; padding: 0 14px; }
+    button.primary { background: var(--primary); }
+    button.secondary { background: #e5e7eb; color: var(--text); }
+    button.danger { background: #dc2626; color: #fff; }
+    button.success { background: #166534; color: #fff; }
+
+    /* Thống kê */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat { background: #fff; border-radius: 14px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+    .stat-number { font-size: 24px; font-weight: 800; }
+    .stat-label { font-size: 12px; color: #6b7280; margin-top: 3px; }
+    .be-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .be-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; font-size: 13px; }
+    .be-card strong { display: block; font-size: 15px; color: var(--primary); }
+
+    /* Bảng điểm danh */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; font-size: 13px; }
+    th { background: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid var(--border); }
+    td { padding: 10px; border-bottom: 1px solid var(--border); }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+    .present { background: #dcfce7; color: #166534; }
+    .absent { background: #f3f4f6; color: #4b5563; }
+    .permit { background: #fef3c7; color: #b45309; }
+    .danger-badge { background: #fee2e2; color: #991b1b; }
+    .action-btn { min-height: 32px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: bold; width: auto; }
+
+    /* Danh sách chương trình Tab 2 */
+    .program-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .program-item h4 { margin: 0 0 4px; }
+
+    /* Tab QR */
+    .qr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .qr-list-box { max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+    .qr-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+    .qr-item input { width: 18px; min-height: 18px; }
+
+    @media(max-width: 700px) {
+      .grid, .qr-grid { grid-template-columns: 1fr; }
+      .admin-header { flex-direction: column; align-items: stretch; }
+      .stats { gap: 6px; }
+      .stat-number { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- 1. MÀN HÌNH ĐĂNG NHẬP ADMIN -->
+  <div id="loginScreen" class="login-box">
+    <div class="login-icon">🔐</div>
+    <h2>Quản Trị Trung Tâm</h2>
+    <p class="muted">Nhập mật khẩu quản trị để truy cập dữ liệu</p>
+    <input type="password" id="adminPassword" placeholder="Mật khẩu Admin" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginAdmin()">
+    <button class="primary" id="loginBtn" style="margin-top:10px" onclick="loginAdmin()">Đăng nhập</button>
+    <div id="loginErr" style="color:#dc2626; font-size:13px; margin-top:8px;"></div>
+  </div>
+
+  <!-- 2. GIAO DIỆN QUẢN TRỊ TOÀN NĂNG -->
+  <div id="adminApp" class="hidden">
+    <div class="admin-header">
+      <div>
+        <h2 style="margin:0;">⚙️ SCYC Admin Hub</h2>
+        <span class="muted" id="currentSessionLabel">Đang tải...</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="secondary" style="width:auto;" onclick="window.open('../index.html','_blank')">📷 Quét QR</button>
+        <button class="secondary" style="width:auto;" onclick="logoutAdmin()">Thoát</button>
+      </div>
+    </div>
+
+    <!-- MENU 3 TAB CHÍNH -->
+    <div class="nav-tabs">
+      <div class="tab-btn active" onclick="switchAdminTab('tabAttendance', this)">📊 Điểm Danh & Chuyên Cần</div>
+      <div class="tab-btn" onclick="switchAdminTab('tabPrograms', this)">📅 Quản Lý Chương Trình</div>
+      <div class="tab-btn" onclick="switchAdminTab('tabQRCards', this)">📷 Xuất Mã QR Thẻ</div>
+    </div>
+
+    <!-- ==================== TAB 1: ĐIỂM DANH & CHUYÊN CẦN ==================== -->
+    <div id="tabAttendance" class="tab-content">
+      <div class="card">
+        <label>📅 Chọn buổi làm việc</label>
+        <select id="sessionSelect" onchange="changeAttendanceSession()"></select>
+        <div id="tapHatNotice" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-number" id="statTotal">-</div><div class="stat-label">Tổng ca viên</div></div>
+        <div class="stat"><div class="stat-number" style="color:#166534;" id="statPresent">-</div><div class="stat-label">Có mặt</div></div>
+        <div class="stat"><div class="stat-number" style="color:#dc2626;" id="statAbsent">-</div><div class="stat-label">Chưa có mặt</div></div>
+      </div>
+
+      <div class="be-grid" id="beStatsWrap"></div>
+
+      <div class="card">
+        <div class="grid" style="margin-bottom:12px;">
+          <input type="text" id="attSearch" placeholder="🔎 Tìm tên hoặc SĐT..." oninput="renderAttendanceTable()">
+          <select id="attFilterStatus" onchange="renderAttendanceTable()">
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="PRESENT">✓ Đã có mặt</option>
+            <option value="ABSENT">Chưa có mặt</option>
+            <option value="PERMIT">🟡 Vắng có phép</option>
+            <option value="UNPERMITTED">🔴 Vắng không phép</option>
+          </select>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button class="secondary action-btn" onclick="printAttendance()">🖨️ In danh sách</button>
+          <button class="secondary action-btn" onclick="exportAttendanceCSV()">📥 Xuất Excel (CSV)</button>
+          <button class="secondary action-btn" onclick="loadAttendanceData()">🔄 Tải lại dữ liệu</button>
+        </div>
+
+        <div class="table-wrap" id="attendanceTableWrap">
+          <div style="text-align:center; padding:30px;" class="muted">Đang tải danh sách...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 2: QUẢN LÝ CHƯƠNG TRÌNH ==================== -->
+    <div id="tabPrograms" class="tab-content hidden">
+      <div class="card">
+        <h3>Các chương trình hiện có</h3>
+        <input type="text" id="progSearch" placeholder="🔎 Tìm tên hoặc ngày..." style="margin-bottom:10px;" oninput="renderProgramList()">
+        <div id="programListWrap"><div class="muted" style="text-align:center; padding:15px;">Đang tải...</div></div>
+      </div>
+
+      <div class="card">
+        <h3 id="formProgTitle">Tạo chương trình mới</h3>
+        <form id="progForm" onsubmit="saveProgram(event)">
+          <div style="background:#f8fafc; padding:10px; border-radius:10px; border:2px solid #e2e8f0; margin-bottom:12px;">
+            <label>Loại chương trình *</label>
+            <select id="loaiBuoi" onchange="toggleProgFormMode()">
+              <option value="TAP_HAT" selected>🎵 Tập hát thường kỳ (Chỉ cần ngày & giờ)</option>
+              <option value="SU_KIEN">🚌 Sự kiện / Lưu diễn (Có đăng ký & địa điểm)</option>
+            </select>
+          </div>
+
+          <div class="grid">
+            <div class="full">
+              <label>Tên chương trình *</label>
+              <input type="text" id="progTen" required value="Tập hát thường kỳ">
+            </div>
+            <div>
+              <label>Ngày diễn ra *</label>
+              <input type="date" id="progNgay" required>
+            </div>
+            <div>
+              <label>Giờ *</label>
+              <input type="time" id="progGio" required value="19:30">
+            </div>
+
+            <!-- Các trường chi tiết sự kiện -->
+            <div class="prog-event-field hidden"><label>Địa điểm</label><input type="text" id="progDiaDiem" placeholder="Nhà thờ..."></div>
+            <div class="prog-event-field hidden"><label>Hạn chót đăng ký</label><input type="datetime-local" id="progHanChot"></div>
+            <div class="prog-event-field hidden"><label>Giới hạn người</label><input type="number" id="progGioiHan" placeholder="Ví dụ: 80"></div>
+            <div class="prog-event-field hidden">
+              <label>Phương tiện đưa đón</label>
+              <select id="progPhuongTien" onchange="togglePickupField()">
+                <option value="KHÔNG ÁP DỤNG">KHÔNG ÁP DỤNG (Tự túc)</option>
+                <option value="ÁP DỤNG">ÁP DỤNG (Có xe chung & xe riêng)</option>
+              </select>
+            </div>
+            <div class="prog-event-field full hidden" id="progPickupWrap">
+              <label>Điểm đón xe chung</label>
+              <input type="text" id="progDiemDon" placeholder="Nhập các điểm đón cách nhau bởi dấu phẩy...">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button type="submit" class="primary" id="progSaveBtn">Lưu chương trình</button>
+            <button type="button" class="secondary" onclick="resetProgForm()">Làm mới Form</button>
+            <button type="button" class="danger hidden" id="progDeleteBtn" onclick="deleteCurrentProg()">Xóa buổi này</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: XUẤT QR PHÔI THẺ ==================== -->
+    <div id="tabQRCards" class="tab-content hidden">
+      <div class="card">
+        <div class="qr-grid">
+          <div>
+            <h3>1. Chọn ca viên</h3>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+              <input type="text" id="qrSearchInput" placeholder="🔎 Tìm tên hoặc mã..." oninput="filterQRList()">
+              <button class="secondary action-btn" onclick="checkAllQR(true)">Tất cả</button>
+              <button class="secondary action-btn" onclick="checkAllQR(false)">Bỏ chọn</button>
+            </div>
+            <div class="qr-list-box" id="qrMemberListWrap"></div>
+          </div>
+
+          <div>
+            <h3>2. Tạo ảnh thẻ</h3>
+            <p class="muted">Tự động gắn mã QR và tên vào phôi thẻ kích thước chuẩn 1080x1350.</p>
+            <div style="margin:12px 0;">Đã chọn: <strong id="qrSelectedCount" style="color:var(--primary); font-size:18px;">0</strong> ca viên</div>
+            <button class="primary" style="margin-bottom:8px;" onclick="generateQRPreview()">🖼️ Xem trước 1 thẻ</button>
+            <button class="success" onclick="generateQRZipBatch()">📦 Xuất file ZIP toàn bộ thẻ</button>
+            <div id="qrBatchProgress" style="font-size:13px; margin-top:8px; color:var(--primary);"></div>
+
+            <div id="qrCanvasPreviewWrap" class="hidden" style="margin-top:14px; text-align:center;">
+              <canvas id="qrPreviewCanvas" style="max-width:100%; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1);"></canvas>
+              <button class="secondary action-btn" style="margin-top:6px;" onclick="downloadSingleCanvas()">⬇️ Tải ảnh này</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://diem-danh-api.remybakery89.workers.dev';
+let adminPassword = sessionStorage.getItem('adminRegistrationPassword') || '';
+let currentSession = '';
+let sessions = [];
+let attendanceMembers = [];
+let allPrograms = [];
+let currentEditingMaBuoi = '';
+
+/* JSONP */
+function jsonp(params) {
+  return new Promise((resolve, reject) => {
+    const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const q = new URLSearchParams({ ...params, callback: cb });
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Kết nối quá lâu.')); }, 15000);
+    function cleanup() { clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); }
+    window[cb] = d => { cleanup(); resolve(d); };
+    script.onerror = () => { cleanup(); reject(new Error('Lỗi máy chủ.')); };
+    script.src = API + '?' + q;
+    document.body.appendChild(script);
+  });
+}
+
+/* KHỞI ĐỘNG & ĐĂNG NHẬP */
+window.addEventListener('load', () => {
+  if (adminPassword) {
+    document.getElementById('adminPassword').value = adminPassword;
+    loginAdmin();
+  }
+});
+
+async function loginAdmin() {
+  const p = (document.getElementById('adminPassword').value || '').trim();
+  const errBox = document.getElementById('loginErr');
+  const btn = document.getElementById('loginBtn');
+  if (!p) { errBox.textContent = 'Vui lòng nhập mật khẩu.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Đang kiểm tra...'; errBox.textContent = '';
+  try {
+    const r = await jsonp({ api: 'registration_admin', password: p });
+    if (!r.success) {
+      errBox.textContent = r.message || 'Mật khẩu không chính xác.';
+      sessionStorage.removeItem('adminRegistrationPassword');
+      return;
+    }
+    adminPassword = p;
+    sessionStorage.setItem('adminRegistrationPassword', p);
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('adminApp').classList.remove('hidden');
+    
+    // Tải dữ liệu ban đầu
+    await loadSessions();
+    await loadProgramsList();
+  } catch(e) {
+    errBox.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Đăng nhập';
+  }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem('adminRegistrationPassword');
+  location.reload();
+}
+
+/* CHUYỂN TAB */
+function switchAdminTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.remove('hidden');
+  btn.classList.add('active');
+
+  if (tabId === 'tabQRCards') renderQRList();
+}
+
+/* ==================== TAB 1: ĐIỂM DANH LOGIC ==================== */
+async function loadSessions() {
+  try {
+    const r = await jsonp({ api: 'admin_get_sessions', password: adminPassword });
+    if (!r.success) return;
+    sessions = r.sessions || [];
+    const select = document.getElementById('sessionSelect');
+    select.innerHTML = sessions.map(s => `<option value="${s.maBuoi}">${s.maBuoi} — ${s.ngay} — ${escapeHtml(s.tenBuoi)}</option>`).join('');
+    
+    currentSession = sessions[0]?.maBuoi || '';
+    if (currentSession) await loadAttendanceData();
+  } catch(e) { console.error(e); }
+}
+
+function changeAttendanceSession() {
+  currentSession = document.getElementById('sessionSelect').value;
+  loadAttendanceData();
+}
+
+async function loadAttendanceData() {
+  if (!currentSession) return;
+  const wrap = document.getElementById('attendanceTableWrap');
+  wrap.innerHTML = '<div style="text-align:center; padding:30px;" class="muted">Đang tải dữ liệu buổi...</div>';
+
+  try {
+    const r = await jsonp({ api: 'admin_get_attendance_data', password: adminPassword, maBuoi: currentSession });
+    if (!r.success) { wrap.innerHTML = `<div class="muted">${r.message}</div>`; return; }
+
+    attendanceMembers = r.members || [];
+    document.getElementById('currentSessionLabel').textContent = `${r.buoi.maBuoi} • ${r.buoi.tenBuoi} (${r.buoi.ngay})`;
+    document.getElementById('statTotal').textContent = r.thongKe.tong;
+    document.getElementById('statPresent').textContent = r.thongKe.daCoMat;
+    document.getElementById('statAbsent').textContent = r.thongKe.chuaCoMat;
+
+    // Render thông tin Bè
+    const beWrap = document.getElementById('beStatsWrap');
+    beWrap.innerHTML = Object.keys(r.beStats || {}).map(b => `
+      <div class="be-card">
+        <strong>${escapeHtml(b)}</strong>
+        ${r.beStats[b].coMat} / ${r.beStats[b].tong} có mặt
+      </div>
+    `).join('');
+
+    renderAttendanceTable();
+  } catch(e) { wrap.innerHTML = `<div class="muted">${e.message}</div>`; }
+}
+
+function renderAttendanceTable() {
+  const q = (document.getElementById('attSearch').value || '').trim().toLowerCase();
+  const stFilter = document.getElementById('attFilterStatus').value;
+
+  const filtered = attendanceMembers.filter(m => {
+    const matchQ = !q || m.hoTen.toLowerCase().includes(q) || m.sdt.includes(q) || m.ma.toLowerCase().includes(q);
+    let matchSt = true;
+    if (stFilter === 'PRESENT') matchSt = m.daDiemDanh;
+    if (stFilter === 'ABSENT') matchSt = !m.daDiemDanh;
+    if (stFilter === 'PERMIT') matchSt = m.vang && m.loaiVang === 'PHÉP';
+    if (stFilter === 'UNPERMITTED') matchSt = m.vang && m.loaiVang === 'KHÔNG PHÉP';
+    return matchQ && matchSt;
+  });
+
+  const wrap = document.getElementById('attendanceTableWrap');
+  if (!filtered.length) { wrap.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">Không có ca viên phù hợp.</div>'; return; }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Mã</th>
+          <th>Họ và tên</th>
+          <th>Bè</th>
+          <th>Trạng thái</th>
+          <th>Chuyên cần tháng</th>
+          <th>Giờ quét</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map((m, i) => {
+          let badge = '<span class="badge absent">Chưa quét</span>';
+          if (m.daDiemDanh) badge = '<span class="badge present">✓ Có mặt</span>';
+          else if (m.vang && m.loaiVang === 'PHÉP') badge = '<span class="badge permit">🟡 Vắng phép</span>';
+          else if (m.vang && m.loaiVang === 'KHÔNG PHÉP') badge = '<span class="badge danger-badge">🔴 Không phép</span>';
+
+          const warnTxt = m.canhBaoChuyenCan ? '<span style="color:#dc2626; font-weight:bold; display:block;">⚠️ Cảnh báo</span>' : '';
+          let action = '—';
+          if (!m.daDiemDanh) {
+            action = (m.vang && m.loaiVang === 'PHÉP') 
+              ? `<button class="secondary action-btn" onclick="clearAbsence('${m.ma}')">↩ Bỏ phép</button>`
+              : `<button class="primary action-btn" onclick="setPermit('${m.ma}')">✓ Cho phép</button>`;
+          }
+
+          return `
+            <tr style="${m.canhBaoChuyenCan ? 'background:#fff5f5;' : ''}">
+              <td>${i + 1}</td>
+              <td style="font-family:monospace; font-weight:bold;">${m.ma}</td>
+              <td style="font-weight:600;">${escapeHtml(m.hoTen)}</td>
+              <td>${escapeHtml(m.be)}</td>
+              <td>${badge}</td>
+              <td>P: ${m.vangPhepThang} · KP: ${m.vangKhongPhepThang}${warnTxt}</td>
+              <td>${m.thoiGian || '—'}</td>
+              <td>${action}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function setPermit(ma) {
+  if (!confirm('Cho phép ca viên này vắng buổi hiện tại?')) return;
+  try {
+    await jsonp({ api: 'admin_set_absence', password: adminPassword, maBuoi: currentSession, ma: ma, loaiVang: 'PHÉP' });
+    const m = attendanceMembers.find(x => x.ma === ma);
+    if (m) { m.vang = true; m.loaiVang = 'PHÉP'; }
+    renderAttendanceTable();
+  } catch(e) { alert(e.message); }
+}
+
+async function clearAbsence(ma) {
+  if (!confirm('Hủy trạng thái vắng phép ca viên này?')) return;
+  try {
+    await jsonp({ api: 'admin_clear_absence', password: adminPassword, maBuoi: currentSession, ma: ma });
+    const m = attendanceMembers.find(x => x.ma === ma);
+    if (m) { m.vang = false; m.loaiVang = ''; }
+    renderAttendanceTable();
+  } catch(e) { alert(e.message); }
+}
+
+function printAttendance() { window.print(); }
+function exportAttendanceCSV() {
+  let csv = '\uFEFFSTT,Mã,Họ tên,Bè,Trạng thái,Thời gian\n';
+  attendanceMembers.forEach((m, i) => {
+    const st = m.daDiemDanh ? 'Có mặt' : (m.vang ? 'Vắng ' + m.loaiVang : 'Chưa có mặt');
+    csv += `"${i + 1}","${m.ma}","${m.hoTen}","${m.be}","${st}","${m.thoiGian}"\n`;
+  });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); a.download = `diem-danh-${currentSession}.csv`; a.click();
+}
+
+/* ==================== TAB 2: QUẢN LÝ CHƯƠNG TRÌNH ==================== */
+async function loadProgramsList() {
+  try {
+    const r = await jsonp({ api: 'registration_programs' });
+    if (!r.success) return;
+    allPrograms = r.programs || [];
+    renderProgramList();
+  } catch(e) { console.error(e); }
+}
+
+function renderProgramList() {
+  const q = (document.getElementById('progSearch').value || '').trim().toLowerCase();
+  const list = allPrograms.filter(p => !q || p.tenBuoi.toLowerCase().includes(q) || p.ngay.includes(q) || p.maBuoi.toLowerCase().includes(q));
+  const wrap = document.getElementById('programListWrap');
+  if (!list.length) { wrap.innerHTML = '<div class="muted">Không có chương trình nào.</div>'; return; }
+
+  wrap.innerHTML = list.map(p => `
+    <div class="program-item">
+      <div>
+        <h4>${escapeHtml(p.tenBuoi)} (${p.maBuoi})</h4>
+        <div class="muted">📅 ${p.ngay} lúc ${p.gio || '—'} · 📍 ${escapeHtml(p.diaDiem || 'Phòng tập')}</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="secondary action-btn" onclick="editProgram('${p.maBuoi}')">Sửa</button>
+        <button class="danger action-btn" onclick="deleteProgramDirect('${p.maBuoi}')">Xóa</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleProgFormMode() {
+  const isTapHat = document.getElementById('loaiBuoi').value === 'TAP_HAT';
+  document.querySelectorAll('.prog-event-field').forEach(el => el.classList.toggle('hidden', isTapHat));
+  if (isTapHat) document.getElementById('progTen').value = 'Tập hát thường kỳ';
+  else togglePickupField();
+}
+
+function togglePickupField() {
+  const isApplied = document.getElementById('progPhuongTien').value === 'ÁP DỤNG';
+  document.getElementById('progPickupWrap').classList.toggle('hidden', !isApplied);
+}
+
+function resetProgForm() {
+  document.getElementById('progForm').reset();
+  currentEditingMaBuoi = '';
+  document.getElementById('loaiBuoi').value = 'TAP_HAT';
+  document.getElementById('progTen').value = 'Tập hát thường kỳ';
+  document.getElementById('progGio').value = '19:30';
+  document.getElementById('progDeleteBtn').classList.add('hidden');
+  document.getElementById('formProgTitle').textContent = 'Tạo chương trình mới';
+  toggleProgFormMode();
+}
+
+async function editProgram(maBuoi) {
+  try {
+    const r = await jsonp({ api: 'admin_program_get', password: adminPassword, maBuoi: maBuoi });
+    if (!r.success) return alert(r.message);
+    const p = r.program;
+    currentEditingMaBuoi = maBuoi;
+
+    const isTapHat = /tập hát|tap hat/i.test(p.tenBuoi);
+    document.getElementById('loaiBuoi').value = isTapHat ? 'TAP_HAT' : 'SU_KIEN';
+    toggleProgFormMode();
+
+    document.getElementById('progTen').value = p.tenBuoi || '';
+    document.getElementById('progNgay').value = p.ngay || '';
+    document.getElementById('progGio').value = p.gio || '';
+    document.getElementById('progDiaDiem').value = p.diaDiem || '';
+    document.getElementById('progHanChot').value = p.hanChot || '';
+    document.getElementById('progGioiHan').value = p.gioiHan || '';
+    document.getElementById('progPhuongTien').value = p.phuongTien || 'KHÔNG ÁP DỤNG';
+    document.getElementById('progDiemDon').value = p.diemDon || '';
+    togglePickupField();
+
+    document.getElementById('formProgTitle').textContent = `Chỉnh sửa: ${maBuoi}`;
+    document.getElementById('progDeleteBtn').classList.remove('hidden');
+    document.getElementById('progForm').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) { alert(e.message); }
+}
+
+async function saveProgram(e) {
+  e.preventDefault();
+  const isTapHat = document.getElementById('loaiBuoi').value === 'TAP_HAT';
+  const payload = {
+    maBuoi: currentEditingMaBuoi,
+    tenBuoi: document.getElementById('progTen').value.trim(),
+    ngay: document.getElementById('progNgay').value,
+    gio: document.getElementById('progGio').value,
+    diaDiem: isTapHat ? 'Phòng tập' : document.getElementById('progDiaDiem').value.trim(),
+    hanChot: isTapHat ? '' : document.getElementById('progHanChot').value,
+    gioiHan: isTapHat ? '' : document.getElementById('progGioiHan').value,
+    phuongTien: isTapHat ? 'KHÔNG ÁP DỤNG' : document.getElementById('progPhuongTien').value,
+    diemDon: isTapHat ? '' : document.getElementById('progDiemDon').value.trim(),
+    cheDoDangKy: 'AUTO',
+    doiTuong: 'TẤT CẢ'
+  };
+
+  const btn = document.getElementById('progSaveBtn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    const r = await jsonp({ api: 'admin_program_save', password: adminPassword, payload: JSON.stringify(payload) });
+    if (!r.success) return alert(r.message);
+    alert(currentEditingMaBuoi ? 'Cập nhật thành công!' : 'Tạo buổi thành công: ' + r.maBuoi);
+    resetProgForm();
+    await loadProgramsList();
+    await loadSessions();
+  } catch(err) { alert(err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Lưu chương trình'; }
+}
+
+async function deleteProgramDirect(maBuoi) {
+  if (!confirm(`Xác nhận xóa hoàn toàn chương trình ${maBuoi} cùng toàn bộ điểm danh liên quan?`)) return;
+  try {
+    const r = await jsonp({ api: 'admin_program_delete', password: adminPassword, maBuoi: maBuoi });
+    if (!r.success) return alert(r.message);
+    alert('Đã xóa thành công!');
+    if (currentEditingMaBuoi === maBuoi) resetProgForm();
+    await loadProgramsList();
+    await loadSessions();
+  } catch(e) { alert(e.message); }
+}
+
+function deleteCurrentProg() {
+  if (currentEditingMaBuoi) deleteProgramDirect(currentEditingMaBuoi);
+}
+
+/* ==================== TAB 3: XUẤT QR PHÔI THẺ ==================== */
+function renderQRList() {
+  const box = document.getElementById('qrMemberListWrap');
+  if (!attendanceMembers.length) { box.innerHTML = '<div class="muted" style="padding:15px;">Đang nạp danh sách...</div>'; return; }
+  box.innerHTML = attendanceMembers.map(m => `
+    <label class="qr-item">
+      <input type="checkbox" class="qr-chk" value="${m.ma}" onchange="updateQRCount()">
+      <div><strong>${escapeHtml(m.hoTen)}</strong> <span class="muted" style="font-family:monospace;">(${m.ma})</span></div>
+    </label>
+  `).join('');
+  updateQRCount();
+}
+
+function filterQRList() {
+  const q = (document.getElementById('qrSearchInput').value || '').trim().toLowerCase();
+  document.querySelectorAll('.qr-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+  });
+}
+
+function checkAllQR(checked) {
+  document.querySelectorAll('.qr-chk').forEach(c => c.checked = checked);
+  updateQRCount();
+}
+
+function updateQRCount() {
+  document.getElementById('qrSelectedCount').textContent = document.querySelectorAll('.qr-chk:checked').length;
+}
+
+function getSelectedQRCodes() {
+  return Array.from(document.querySelectorAll('.qr-chk:checked')).map(c => c.value);
+}
+
+// Vẽ Canvas chuẩn Template (1080x1350)
+function buildCardCanvas(member) {
+  return new Promise((resolve, reject) => {
+    const template = new Image();
+    template.crossOrigin = 'anonymous';
+    template.src = 'template-qr.png'; // File phôi đặt trong member/template-qr.png
+
+    template.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080; canvas.height = 1350;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(template, 0, 0, 1080, 1350);
+
+      // Tạo QR
+      const div = document.createElement('div');
+      new QRCode(div, { text: member.ma, width: 470, height: 470, correctLevel: QRCode.CorrectLevel.H });
+
+      setTimeout(() => {
+        const qrEl = div.querySelector('canvas') || div.querySelector('img');
+        if (qrEl) ctx.drawImage(qrEl, 305, 696.4, 470, 470);
+
+        // Chèn mã số
+        ctx.fillStyle = '#6b4527';
+        ctx.font = 'bold 49px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(member.ma, 540, 1260.1);
+        resolve(canvas);
+      }, 70);
+    };
+
+    // Nếu không có file template thì vẽ thẻ trắng dự phòng
+    template.onerror = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 500; canvas.height = 600;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 500, 600);
+      ctx.strokeStyle = '#1967d2'; ctx.lineWidth = 4; ctx.strokeRect(10, 10, 480, 580);
+
+      const div = document.createElement('div');
+      new QRCode(div, { text: member.ma, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.H });
+      setTimeout(() => {
+        const qrEl = div.querySelector('canvas') || div.querySelector('img');
+        if (qrEl) ctx.drawImage(qrEl, 70, 50, 360, 360);
+        ctx.fillStyle = '#111827'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(member.hoTen, 250, 470);
+        ctx.fillStyle = '#1967d2'; ctx.font = 'bold 28px monospace';
+        ctx.fillText(member.ma, 250, 520);
+        resolve(canvas);
+      }, 70);
+    };
+  });
+}
+
+let previewCanvasObj = null;
+async function generateQRPreview() {
+  const codes = getSelectedQRCodes();
+  if (!codes.length) return alert('Hãy chọn ít nhất 1 ca viên.');
+  const m = attendanceMembers.find(x => x.ma === codes[0]);
+
+  const canvas = await buildCardCanvas(m);
+  previewCanvasObj = canvas;
+  const p = document.getElementById('qrPreviewCanvas');
+  p.width = canvas.width; p.height = canvas.height;
+  p.getContext('2d').drawImage(canvas, 0, 0);
+  document.getElementById('qrCanvasPreviewWrap').classList.remove('hidden');
+}
+
+function downloadSingleCanvas() {
+  if (!previewCanvasObj) return;
+  const a = document.createElement('a'); a.href = previewCanvasObj.toDataURL('image/png'); a.download = 'The_QR.png'; a.click();
+}
+
+async function generateQRZipBatch() {
+  const codes = getSelectedQRCodes();
+  if (!codes.length) return alert('Hãy chọn ít nhất 1 ca viên.');
+  const prog = document.getElementById('qrBatchProgress');
+  const zip = new JSZip();
+
+  for (let i = 0; i < codes.length; i++) {
+    const m = attendanceMembers.find(x => x.ma === codes[i]);
+    prog.textContent = `Đang xử lý ${i + 1}/${codes.length}: ${m.hoTen}...`;
+    const canvas = await buildCardCanvas(m);
+    const data = canvas.toDataURL('image/png').split(',')[1];
+    zip.file(`${m.ma}_${m.hoTen.replace(/[^a-zA-Z0-9]/g, '_')}.png`, data, { base64: true });
+  }
+
+  prog.textContent = 'Đang đóng gói file ZIP...';
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Bo_The_QR_SCYC.zip'; a.click();
+  prog.textContent = '✅ Đã tải file zip thành công!';
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+}
+</script>
+</body>
+</html>
