@@ -141,6 +141,7 @@
       <div class="tab-btn active" onclick="switchAdminTab('tabAttendance', this)">📊 Điểm Danh & Chuyên Cần</div>
       <div class="tab-btn" onclick="switchAdminTab('tabPrograms', this)">📅 Quản Lý Chương Trình</div>
       <div class="tab-btn" onclick="switchAdminTab('tabQRCards', this)">📷 Xuất Mã QR Thẻ</div>
+      <div class="tab-btn" onclick="switchAdminTab('tabBulletinAdmin', this)">📢 Bảng Tin</div>
     </div>
 
     <!-- ==================== TAB 1: ĐIỂM DANH & CHUYÊN CẦN ==================== -->
@@ -272,6 +273,42 @@
         </div>
       </div>
     </div>
+        <!-- ==================== TAB: QUẢN LÝ BẢNG TIN ==================== -->
+    <div id="tabBulletinAdmin" class="tab-content hidden">
+      <div class="card">
+        <h3>📢 Đăng Thông Báo Mới</h3>
+        <form id="bulletinForm" onsubmit="postBulletin(event)">
+          <div class="grid">
+            <div class="full">
+              <label>Tiêu đề thông báo *</label>
+              <input type="text" id="bulTitle" placeholder="Ví dụ: Lưu ý trang phục lễ CN / Bài hát tập..." required>
+            </div>
+            <div>
+              <label>Mức độ</label>
+              <select id="bulType">
+                <option value="NORMAL">📢 Thông thường (Màu xanh lá)</option>
+                <option value="IMPORTANT">🚨 Khẩn / Quan trọng (Màu đỏ)</option>
+              </select>
+            </div>
+            <div>
+              <label>Người / Ban đăng tin</label>
+              <input type="text" id="bulAuthor" value="Ban Điều Hành" required>
+            </div>
+            <div class="full">
+              <label>Nội dung chi tiết *</label>
+              <textarea id="bulContent" rows="4" placeholder="Nhập nội dung thông báo cho ca đoàn..." required></textarea>
+            </div>
+          </div>
+          <button type="submit" class="primary" id="btnPostBul" style="margin-top:12px; width:auto;">Đăng thông báo</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>Các thông báo đang ghim</h3>
+        <div id="adminBulListWrap"><div class="muted">Đang tải thông báo...</div></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -746,6 +783,60 @@ async function generateQRZipBatch() {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 }
+async function loadAdminBulletins() {
+  const wrap = document.getElementById('adminBulListWrap');
+  try {
+    const res = await jsonp({ api: 'bulletin_list' });
+    if (!res.success || !res.notices || !res.notices.length) {
+      wrap.innerHTML = '<div class="muted">Chưa có thông báo nào.</div>';
+      return;
+    }
+    wrap.innerHTML = res.notices.map(n => `
+      <div style="border-bottom:1px solid #e5e7eb; padding:10px 0; display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <strong>${n.loai === 'IMPORTANT' ? '🚨' : '📢'} ${escapeHtml(n.tieu_de)}</strong>
+          <div style="font-size:12px; color:#6b7280; margin:2px 0 6px;">Đăng bởi: ${escapeHtml(n.nguoi_dang)} • ${n.ngay_tao}</div>
+          <div style="font-size:13px; color:#374151; white-space:pre-line;">${escapeHtml(n.noi_dung)}</div>
+        </div>
+        <button class="danger action-btn" onclick="deleteBulletin(${n.id})" style="margin-left:10px;">Xóa</button>
+      </div>
+    `).join('');
+  } catch(e) { wrap.innerHTML = `<div class="muted">${e.message}</div>`; }
+}
+
+async function postBulletin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnPostBul');
+  btn.disabled = true; btn.textContent = 'Đang đăng...';
+
+  try {
+    const res = await jsonp({
+      api: 'admin_bulletin_create',
+      password: adminPassword,
+      tieuDe: document.getElementById('bulTitle').value.trim(),
+      noiDung: document.getElementById('bulContent').value.trim(),
+      loai: document.getElementById('bulType').value,
+      nguoiDang: document.getElementById('bulAuthor').value.trim()
+    });
+    if (!res.success) return alert(res.message);
+    alert('Đã đăng thông báo thành công!');
+    document.getElementById('bulletinForm').reset();
+    document.getElementById('bulAuthor').value = 'Ban Điều Hành';
+    loadAdminBulletins();
+  } catch(err) { alert(err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Đăng thông báo'; }
+}
+
+async function deleteBulletin(id) {
+  if (!confirm('Bạn có chắc muốn xóa thông báo này khỏi Bảng tin?')) return;
+  try {
+    const res = await jsonp({ api: 'admin_bulletin_delete', password: adminPassword, id: id });
+    if (!res.success) return alert(res.message);
+    loadAdminBulletins();
+  } catch(e) { alert(e.message); }
+}
+
+  
 </script>
 </body>
 </html>
