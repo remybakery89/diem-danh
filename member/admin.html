@@ -551,7 +551,9 @@ function renderProgramList() {
         <h4>${escapeHtml(p.tenBuoi)} (${p.maBuoi})</h4>
         <div class="muted">📅 ${p.ngay} lúc ${p.gio || '—'} · 📍 ${escapeHtml(p.diaDiem || 'Phòng tập')}</div>
       </div>
-      <div style="display:flex; gap:6px;">
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="action-btn" style="background:#2563eb; color:#fff;" onclick="location.href='admin-program.html?maBuoi=' + encodeURIComponent('${p.maBuoi}')">📊 Tổng quan</button>
+        <button class="action-btn" style="background:#059669; color:#fff;" onclick="location.href='admin-registrations-v5.html?maBuoi=' + encodeURIComponent('${p.maBuoi}')">📋 Duyệt & Lịch sử</button>
         <button class="secondary action-btn" onclick="editProgram('${p.maBuoi}')">Sửa</button>
         <button class="danger action-btn" onclick="deleteProgramDirect('${p.maBuoi}')">Xóa</button>
       </div>
