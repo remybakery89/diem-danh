@@ -826,7 +826,10 @@ function escapeHtml(s) {
   }
 
   function getToken() {
-    return sessionStorage.getItem('memberRegistrationToken') || '';
+    return sessionStorage.getItem('memberRegistrationToken') 
+      || sessionStorage.getItem('memberToken') 
+      || (window.currentUser && window.currentUser.ma) 
+      || '';
   }
 
   function findMine(maBuoi) {
