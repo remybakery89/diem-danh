@@ -814,7 +814,7 @@ function escapeHtml(s) {
 }
 
 /* ============================================================
- * VÒNG 5B — GIAO DIỆN ĐĂNG KÝ & LỊCH SỬ
+ * VÒNG 5B — GIAO DIỆN ĐĂNG KÝ & LỊCH SỬ (ĐÃ SỬA ID & CHẶN RỖNG)
  * ============================================================ */
 (function () {
   var v5Mine = [];
@@ -846,55 +846,64 @@ function escapeHtml(s) {
   }
 
   function statusButtons(maBuoi, mine, disabled) {
-    if (disabled) return '<button disabled>Không thể đăng ký</button>';
+    if (disabled) return '<button disabled style="opacity:0.6;">Đã đóng đăng ký</button>';
     var current = mine && mine.trangThai ? mine.trangThai : '';
     var pending = current === 'CHỜ DUYỆT';
-    var html = '<div class="small muted" style="margin-bottom:8px">Chọn trạng thái tham gia:</div><div class="row">';
+    var html = '<div class="small muted" style="margin:10px 0 6px; font-weight:600; font-size:12px;">Chọn trạng thái tham gia:</div><div style="display:flex; gap:6px;">';
+    
     ['ĐI','KHÔNG ĐI','DỰ BỊ'].forEach(function (status) {
-      var label = status;
-      if (pending && mine.trangThaiYeuCau === status) label += ' (đang chờ)';
+      var isCur = current === status;
+      var bg = isCur ? (status === 'ĐI' ? '#dcfce7' : (status === 'KHÔNG ĐI' ? '#fee2e2' : '#fef3c7')) : '#fff';
+      var border = isCur ? (status === 'ĐI' ? '#16a34a' : (status === 'KHÔNG ĐI' ? '#dc2626' : '#d97706')) : '#d1d5db';
+      var color = isCur ? (status === 'ĐI' ? '#166534' : (status === 'KHÔNG ĐI' ? '#991b1b' : '#92400e')) : '#374151';
+
       html += '<button type="button" ' + (pending ? 'disabled' : '') +
+        ' style="flex:1; min-height:40px; border:2px solid ' + border + '; background:' + bg + '; color:' + color + '; font-weight:700; border-radius:8px; cursor:pointer;" ' +
         ' onclick="v5SubmitStatus(\'' + encodeURIComponent(maBuoi) + '\',\'' + encodeURIComponent(status) + '\')">' +
-        escV5(label) + '</button>';
+        escV5(status) + (isCur ? ' ✓' : '') + '</button>';
     });
     html += '</div>';
+
     if (mine && current !== 'CHỜ DUYỆT') {
-      html += '<button type="button" class="danger" style="margin-top:10px" onclick="v5CancelRegistration(\'' + encodeURIComponent(maBuoi) + '\')">Hủy đăng ký</button>';
+      html += '<button type="button" class="danger" style="margin-top:8px; width:100%; min-height:36px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:8px; font-weight:700; cursor:pointer;" onclick="v5CancelRegistration(\'' + encodeURIComponent(maBuoi) + '\')">Hủy đăng ký</button>';
     }
     return html;
   }
 
   function renderHistory(history) {
-    if (!history || !history.length) return '<p class="muted small">Chưa có lịch sử thay đổi.</p>';
-    return '<div class="v5-history">' + history.slice().reverse().map(function (h) {
+    if (!history || !history.length) return '<p class="muted small" style="padding:6px 0; margin:0;">Chưa có lịch sử thay đổi.</p>';
+    return '<div class="v5-history" style="margin-top:6px; font-size:12px;">' + history.slice().reverse().map(function (h) {
       var title = h.loai || 'Cập nhật';
       var status = h.trangThaiMoi || h.trangThaiYeuCau || '';
-      return '<div style="padding:9px 0;border-top:1px solid #eee">' +
+      return '<div style="padding:6px 0; border-top:1px dashed #e5e7eb;">' +
         '<b>' + escV5(title) + '</b>' +
-        (status ? ' · <span class="status ' + statusClass(status) + '">' + escV5(status) + '</span>' : '') +
-        '<div class="muted small">' + escV5(h.thoiGian || '') + (h.lyDo ? ' · Lý do: ' + escV5(h.lyDo) : '') + '</div>' +
+        (status ? ' · <span class="status ' + statusClass(status) + '" style="font-weight:bold;">' + escV5(status) + '</span>' : '') +
+        '<div class="muted" style="font-size:11px; margin-top:2px;">' + escV5(h.thoiGian || '') + (h.lyDo ? ' · Lý do: <i>' + escV5(h.lyDo) + '</i>' : '') + '</div>' +
         '</div>';
     }).join('') + '</div>';
   }
 
   function renderProgramsV5(list) {
-    var box = document.getElementById('programs');
+    // Tìm đúng container hiển thị danh sách (hỗ trợ cả programList và programs)
+    var box = document.getElementById('programList') || document.getElementById('programs');
     if (!box) return;
-    if (!list || !list.length) { box.innerHTML = '<p class="muted">Chưa có chương trình.</p>'; return; }
+    if (!list || !list.length) { box.innerHTML = '<p class="muted" style="text-align:center; padding:20px;">Chưa có chương trình nào.</p>'; return; }
+
     box.innerHTML = list.map(function (p) {
       var mine = findMine(p.maBuoi);
       var canSubmit = p.trangThai === 'ĐANG MỞ';
       var current = mine ? String(mine.trangThai || '') : '';
       var statusHtml = mine
-        ? '<span class="status ' + statusClass(current) + '">' + escV5(current) + '</span>' +
-          (mine.trangThaiYeuCau ? ' · yêu cầu: <span class="status warn">' + escV5(mine.trangThaiYeuCau) + '</span>' : '')
+        ? '<span class="status ' + statusClass(current) + '" style="font-weight:700;">' + escV5(current) + '</span>'
         : '<span class="muted">Chưa đăng ký</span>';
-      return '<div class="program"><h3>' + escV5(p.tenBuoi) + '</h3>' +
-        '<p>📅 ' + escV5(p.ngay) + (p.gio ? ' · ' + escV5(p.gio) : '') + '</p>' +
-        (p.diaDiem ? '<p>📍 ' + escV5(p.diaDiem) + '</p>' : '') +
-        '<p>' + statusHtml + (p.gioiHan ? ' · Giới hạn ' + escV5(p.gioiHan) : '') + '</p>' +
-        (p.ghiChu ? '<p class="muted small">' + escV5(p.ghiChu) + '</p>' : '') +
-        '<div style="margin-top:10px">' + statusButtons(p.maBuoi, mine, !canSubmit) + '</div></div>';
+
+      return '<div class="program-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:14px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">' +
+        '<h3 style="margin:0 0 6px; font-size:16px;">' + escV5(p.tenBuoi) + '</h3>' +
+        '<p style="margin:4px 0; font-size:13px; color:#4b5563;">📅 ' + escV5(p.ngay) + (p.gio ? ' · ' + escV5(p.gio) : '') + '</p>' +
+        (p.diaDiem ? '<p style="margin:4px 0; font-size:13px; color:#4b5563;">📍 ' + escV5(p.diaDiem) + '</p>' : '') +
+        '<p style="margin:6px 0 0; font-size:13px;">Trạng thái: ' + statusHtml + '</p>' +
+        (p.ghiChu ? '<p class="muted small" style="margin-top:4px; font-style:italic;">' + escV5(p.ghiChu) + '</p>' : '') +
+        '<div style="margin-top:10px;">' + statusButtons(p.maBuoi, mine, !canSubmit) + '</div></div>';
     }).join('');
   }
 
@@ -902,74 +911,117 @@ function escapeHtml(s) {
     var token = getToken();
     if (!token) return;
     var r = await window.jsonp({api:'registration_v5_mine', token:token});
-    if (!r.success) {
-      if (r.type === 'SESSION_EXPIRED' && typeof window.logout === 'function') window.logout();
-      throw new Error(r.message || 'Không tải được đăng ký.');
-    }
+    if (!r.success) return;
     v5Mine = r.registrations || [];
-    var mineBox = document.getElementById('mine');
+
+    // Tìm đúng container tab "Đã đăng ký"
+    var mineBox = document.getElementById('tabMineList') || document.getElementById('mine');
     if (!mineBox) return;
+
     mineBox.innerHTML = v5Mine.length ? v5Mine.map(function (x) {
       var status = x.trangThai || '';
-      var text = status === 'CHỜ DUYỆT' ? '<span class="warn">⏳ Chờ Admin duyệt</span>' :
-        status === 'ĐI' ? '<span class="ok">✓ ĐI</span>' :
-        status === 'KHÔNG ĐI' ? '<span class="danger-text">✕ KHÔNG ĐI</span>' :
-        status === 'DỰ BỊ' ? '<span class="warn">◐ DỰ BỊ</span>' : '<span class="muted">Đã hủy</span>';
-      var request = x.trangThaiYeuCau ? '<p class="muted small">Yêu cầu đang chờ: ' + escV5(x.trangThaiYeuCau) + '</p>' : '';
-      var updated = x.thoiGianCapNhat ? '<p class="muted small">Cập nhật: ' + escV5(x.thoiGianCapNhat) + '</p>' : '';
-      var cancel = status !== 'ĐÃ HỦY' && status !== 'CHỜ DUYỆT' ? '<button class="danger" onclick="v5CancelRegistration(\'' + encodeURIComponent(x.maBuoi) + '\')">Hủy đăng ký</button>' : '';
-      return '<div class="program"><b>' + escV5(x.tenBuoi || x.maBuoi) + '</b><p class="muted small">' + escV5(x.ngay || '') + (x.gio ? ' · ' + escV5(x.gio) : '') + '</p><p>' + text + '</p>' + request + updated +
-        '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">Xem lịch sử</summary>' + renderHistory(x.lichSu) + '</details>' +
-        (cancel ? '<div style="margin-top:10px">' + cancel + '</div>' : '') + '</div>';
-    }).join('') : '<p class="muted">Bạn chưa có đăng ký nào.</p>';
+      var text = status === 'CHỜ DUYỆT' ? '<span style="color:#d97706; font-weight:bold;">⏳ Chờ Admin duyệt</span>' :
+        status === 'ĐI' ? '<span style="color:#16a34a; font-weight:bold;">✓ ĐI</span>' :
+        status === 'KHÔNG ĐI' ? '<span style="color:#dc2626; font-weight:bold;">✕ KHÔNG ĐI</span>' :
+        status === 'DỰ BỊ' ? '<span style="color:#d97706; font-weight:bold;">◐ DỰ BỊ</span>' : '<span class="muted">Đã hủy</span>';
+      
+      var updated = x.thoiGianCapNhat ? '<p class="muted small" style="margin:4px 0; font-size:11px;">Cập nhật: ' + escV5(x.thoiGianCapNhat) + '</p>' : '';
+      var cancel = status !== 'ĐÃ HỦY' && status !== 'CHỜ DUYỆT' ? '<button type="button" class="danger" style="margin-top:8px; padding:6px 12px; background:#fee2e2; color:#dc2626; border:0; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="v5CancelRegistration(\'' + encodeURIComponent(x.maBuoi) + '\')">Hủy đăng ký</button>' : '';
+
+      return '<div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:10px;">' +
+        '<b>' + escV5(x.tenBuoi || x.maBuoi) + '</b>' +
+        '<p class="muted small" style="margin:4px 0; font-size:12px;">' + escV5(x.ngay || '') + (x.gio ? ' · ' + escV5(x.gio) : '') + '</p>' +
+        '<p style="margin:4px 0;">' + text + '</p>' + updated +
+        '<details style="margin-top:8px; border-top:1px dashed #e5e7eb; padding-top:6px;"><summary style="cursor:pointer; font-weight:700; font-size:12px; color:#1e40af;">📜 Xem lịch sử thay đổi</summary>' + renderHistory(x.lichSu) + '</details>' +
+        (cancel ? '<div style="margin-top:6px;">' + cancel + '</div>' : '') + '</div>';
+    }).join('') : '<p class="muted" style="text-align:center; padding:20px;">Bạn chưa có đăng ký nào.</p>';
   }
 
   async function submitStatus(encodedMaBuoi, encodedStatus) {
     var maBuoi = decodeURIComponent(encodedMaBuoi), status = decodeURIComponent(encodedStatus);
-    var mine = findMine(maBuoi), isChange = !!mine && mine.trangThai !== status, reason = '';
-    if (isChange) {
-      reason = prompt('Bạn đang thay đổi trạng thái. Vui lòng nhập lý do:', '');
-      if (reason === null) return;
-      if (!reason.trim()) { alert('Vui lòng nhập lý do thay đổi.'); return; }
-    }
-    try {
-      var r = await window.jsonp({api:'registration_v5_submit',token:getToken(),maBuoi:maBuoi,trangThai:status,lyDo:reason || ''});
-      if (!r.success) {
-        if (r.type === 'REASON_REQUIRED') {
-          reason = prompt(r.message || 'Vui lòng nhập lý do:', '');
-          if (reason === null || !reason.trim()) return;
-          r = await window.jsonp({api:'registration_v5_submit',token:getToken(),maBuoi:maBuoi,trangThai:status,lyDo:reason.trim()});
-        }
+    var mine = findMine(maBuoi);
+    var isChange = !!mine && mine.trangThai !== status;
+    var isNotGoing = (status === 'KHÔNG ĐI' || status === 'DỰ BỊ');
+    var reason = '';
+
+    // BẮT BUỘC NHẬP LÝ DO: KHÔNG ĐƯỢC ĐỂ TRỐNG
+    if (isNotGoing || isChange) {
+      var promptMsg = isNotGoing 
+        ? 'Bạn chọn "' + status + '". Vui lòng nhập lý do cụ thể gửi BĐH (bắt buộc):' 
+        : 'Bạn đang thay đổi trạng thái tham gia. Vui lòng nhập lý do (bắt buộc):';
+      
+      var inputReason = prompt(promptMsg, '');
+      if (inputReason === null) return; // Bấm Cancel thì không làm gì
+      reason = inputReason.trim();
+      
+      if (!reason) {
+        alert('Lý do không được để trống! Thao tác đã bị hủy.');
+        return;
       }
-      if (!r.success) { alert(r.message || 'Không cập nhật được đăng ký.'); return; }
-      alert(r.message || 'Đã cập nhật đăng ký.');
-      await window.refreshAll();
-    } catch (e) { alert(e.message || 'Không cập nhật được đăng ký.'); }
+    }
+
+    try {
+      var r = await window.jsonp({
+        api: 'registration_v5_submit',
+        token: getToken(),
+        maBuoi: maBuoi,
+        trangThai: status,
+        lyDo: reason
+      });
+
+      if (!r.success) {
+        alert(r.message || 'Không thể cập nhật trạng thái.');
+        return;
+      }
+
+      alert('Đã cập nhật trạng thái thành công!');
+      if (typeof window.refreshAll === 'function') await window.refreshAll();
+      else {
+        await loadMineV5();
+        if (typeof window.loadPrograms === 'function') await window.loadPrograms();
+      }
+    } catch (e) {
+      alert('Lỗi: ' + e.message);
+    }
   }
 
   async function cancelV5(encodedMaBuoi) {
     var maBuoi = decodeURIComponent(encodedMaBuoi);
-    if (!confirm('Bạn có chắc muốn hủy đăng ký chương trình này?')) return;
+    var reason = prompt('Vui lòng nhập lý do hủy đăng ký (bắt buộc):', '');
+    if (reason === null) return;
+    reason = reason.trim();
+    if (!reason) {
+      alert('Bạn phải nhập lý do hủy đăng ký.');
+      return;
+    }
+
     try {
-      var r = await window.jsonp({api:'registration_v5_cancel',token:getToken(),maBuoi:maBuoi});
+      var r = await window.jsonp({
+        api: 'registration_v5_cancel',
+        token: getToken(),
+        maBuoi: maBuoi,
+        lyDo: reason
+      });
+
       if (!r.success) { alert(r.message || 'Không thể hủy đăng ký.'); return; }
-      alert(r.message || 'Đã hủy đăng ký.');
-      await window.refreshAll();
+      alert('Đã hủy đăng ký thành công.');
+      if (typeof window.refreshAll === 'function') await window.refreshAll();
+      else {
+        await loadMineV5();
+        if (typeof window.loadPrograms === 'function') await window.loadPrograms();
+      }
     } catch (e) { alert(e.message || 'Không thể hủy đăng ký.'); }
   }
 
   function hook() {
-    if (typeof window.jsonp !== 'function' || typeof window.refreshAll !== 'function' || typeof window.loadMine !== 'function' || typeof window.renderPrograms !== 'function') {
-      setTimeout(hook,50); return;
+    if (typeof window.jsonp !== 'function') {
+      setTimeout(hook, 50); return;
     }
-    if (window.__v5RegistrationHooked) return;
     window.__v5RegistrationHooked = true;
     window.loadMine = function () { return loadMineV5(); };
     window.renderPrograms = function (list) { renderProgramsV5(list); };
     window.v5SubmitStatus = submitStatus;
     window.v5CancelRegistration = cancelV5;
-    window.registerProgram = function (encoded) { return submitStatus(encoded, encodeURIComponent('ĐI')); };
-    window.cancelProgram = cancelV5;
   }
   hook();
 })();
