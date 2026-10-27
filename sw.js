@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diem-danh-scyc-v2';
+const CACHE_NAME = 'diem-danh-scyc-v3';
 
 // Danh sách các file tĩnh cần lưu trong máy để dùng khi mất mạng
 const ASSETS_TO_CACHE = [
@@ -36,7 +36,7 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
   const url = event.request.url;
 
-  // 1. Tuyệt đối không can thiệp vào các API động (Google Script, Cloudflare Worker)
+  // 1. Không can thiệp vào các API động (Google Script, Cloudflare Worker)
   if (
     url.includes('script.google.com') ||
     url.includes('workers.dev') ||
@@ -45,11 +45,10 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  // 2. Với file giao diện (HTML, JS, CSS, CDN QR): ưu tiên nạp mạng, nếu mất mạng thì lấy từ cache
+  // 2. Giao diện tĩnh: ưu tiên mạng, mất mạng lấy từ cache
   event.respondWith(
     fetch(event.request)
       .then(function (response) {
-        // Nếu tải từ mạng thành công, tự động cập nhật bản mới vào cache
         if (response && response.status === 200 && response.type === 'basic') {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then(function (cache) {
@@ -59,12 +58,10 @@ self.addEventListener('fetch', function (event) {
         return response;
       })
       .catch(function () {
-        // Khi mất mạng: lấy từ bộ nhớ đệm đã lưu
         return caches.match(event.request).then(function (cachedResponse) {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Trường hợp truy cập đường dẫn thư mục /member/ khi offline
           if (event.request.mode === 'navigate') {
             return caches.match('./member/index.html') || caches.match('./index.html');
           }
@@ -72,35 +69,48 @@ self.addEventListener('fetch', function (event) {
       })
   );
 });
-// Lắng nghe tín hiệu Push từ Cloudflare
-self.addEventListener('push', function(event) {
-  let data = { title: 'Thông báo SCYC', body: 'Bạn có thông báo mới từ ca đoàn!' };
-  if (event.data) {
-    try {
-      data = event.data.json();
-    } catch(e) {
-      data.body = event.data.text();
-    }
-  }
 
-  const options = {
-    body: data.body,
-    icon: 'icons/icon-192.png',     // Icon thông báo
-    badge: 'icons/icon-192.png',    // Icon nhỏ trên thanh trạng thái
-    vibrate: [100, 50, 100],        // Rung máy
-    data: { url: data.url || '/member/' }
-  };
-
+// LẮNG NGHE TÍN HIỆU PUSH TỪ CLOUDFLARE WORKER
+self.addEventListener('push', function (event) {
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    fetch('https://diem-danh-api.remybakery89.workers.dev/?api=bulletin_list')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        let title = 'Thông báo SCYC';
+        let body = 'Có thông báo mới từ Ban Điều Hành!';
+
+        if (data && data.success && data.notices && data.notices.length > 0) {
+          const latest = data.notices[0];
+          title = (latest.loai === 'IMPORTANT' ? '🚨 ' : '📢 ') + latest.tieu_de;
+          body = latest.noi_dung;
+        }
+
+        const options = {
+          body: body,
+          icon: 'icons/icon-192.png',
+          badge: 'icons/icon-192.png',
+          vibrate: [200, 100, 200],
+          data: { url: './member/index.html' }
+        };
+
+        return self.registration.showNotification(title, options);
+      })
+      .catch(function () {
+        return self.registration.showNotification('Thông báo SCYC', {
+          body: 'Bạn có thông báo mới từ ca đoàn!',
+          icon: 'icons/icon-192.png'
+        });
+      })
   );
 });
 
-// Khi ca viên bấm vào thông báo trên thanh trạng thái -> Mở App
-self.addEventListener('notificationclick', function(event) {
+// KHI BẤM VÀO THÔNG BÁO TRÊN THANH TRẠNG THÁI -> MỞ APP
+self.addEventListener('notificationclick', function (event) {
   event.notification.close();
+  const targetUrl = event.notification.data ? event.notification.data.url : './member/index.html';
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
       for (let i = 0; i < clientList.length; i++) {
         let client = clientList[i];
         if (client.url.includes('/member/') && 'focus' in client) {
@@ -108,7 +118,7 @@ self.addEventListener('notificationclick', function(event) {
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow(event.notification.data.url || '/member/');
+        return clients.openWindow(targetUrl);
       }
     })
   );
