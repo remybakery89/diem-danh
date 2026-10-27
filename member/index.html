@@ -276,6 +276,9 @@
     <div class="main-content">
       <!-- TAB 1: THẺ QR CÁ NHÂN -->
       <div id="tabQR" class="tab-pane active">
+      <button id="btnEnablePush" onclick="subscribeUserPush()" style="display:none; width:100%; margin-bottom:12px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:10px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;">
+  🔔 Bật thông báo đẩy về điện thoại
+</button>
         <!-- BẢNG TIN THÔNG BÁO NỘI BỘ -->
         <div id="bulletinWrap" style="display:none; margin-bottom:16px;"></div>
 
@@ -405,7 +408,57 @@ function jsonp(params) {
     document.body.appendChild(script);
   });
 }
+const VAPID_PUBLIC_KEY = 'BASQVHD9qn5QtEhPqyDHSyAZkP7f6Agp-m5soluQyittR-zFg0VMkhnU8rFtAU3FjIb3FRrgUxJfNdskYsoDRlw';
 
+// Kiểm tra quyền khi vào app
+function checkPushPermission() {
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    if (Notification.permission !== 'granted') {
+      document.getElementById('btnEnablePush').style.display = 'block';
+    }
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function subscribeUserPush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      alert('Bạn đã từ chối cấp quyền thông báo.');
+      return;
+    }
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+
+    // Gửi subscription lên Worker để lưu vào D1
+    const res = await jsonp({
+      api: 'push_subscribe',
+      ma: currentUser.ma,
+      subscription: JSON.stringify(subscription)
+    });
+
+    if (res.success) {
+      alert('Đã kích hoạt thông báo đẩy lên điện thoại thành công!');
+      document.getElementById('btnEnablePush').style.display = 'none';
+    }
+  } catch(err) {
+    alert('Lỗi kích hoạt thông báo: ' + err.message);
+  }
+}
 function updateNetworkStatus() {
   const bar = document.getElementById('offlineBar');
   if (!navigator.onLine) { bar.style.display = 'block'; }
