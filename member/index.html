@@ -607,6 +607,10 @@ async function loadPrograms() {
         ? `<span style="font-weight:700; color:#1967d2;">${escapeHtml(current)}</span>` 
         : '<span style="color:#6b7280;">Chưa đăng ký</span>';
 
+      // Hiển thị thông tin xe nếu buổi có áp dụng xe
+      const hasXe = p.phuongTien === 'ÁP DỤNG' || p.phuongTien === 'XE CHUNG';
+      const xeInfo = hasXe ? `<div style="font-size:12px; color:#059669; margin-top:4px; font-weight:600;">🚌 Có xe đưa đón (Điểm đón: ${escapeHtml(p.diemDon || 'Nhà thờ')})</div>` : '';
+
       return `
         <div class="program-card">
           <span class="badge ${isOpen ? 'badge-open' : 'badge-closed'}">${p.trangThai}</span>
@@ -614,6 +618,7 @@ async function loadPrograms() {
           <div class="program-meta">
             📅 ${escapeHtml(p.ngay)} lúc ${escapeHtml(p.gio || '—')}<br>
             📍 ${escapeHtml(p.diaDiem || 'Tại nhà thờ')}<br>
+            ${xeInfo}
             Trạng thái của bạn: ${statusHtml}
           </div>
           ${statusButtons(p.maBuoi, mine, !isOpen)}
@@ -671,27 +676,32 @@ async function loadMyRegistrations() {
 async function submitStatus(encodedMaBuoi, encodedStatus) {
   const maBuoi = decodeURIComponent(encodedMaBuoi);
   const status = decodeURIComponent(encodedStatus);
-  const prog = programs.find(p => p.maBuoi === maBuoi);
+  const prog = programs.find(p => p.maBuoi === maBuoi) || {};
   const mine = findMine(maBuoi);
-  const isChange = !!mine && mine.trangThai !== status;
-  const isNotGoing = (status === 'KHÔNG ĐI' || status === 'DỰ BỊ');
+  const isChange = !!mine && mine.trangThai && mine.trangThai !== 'ĐÃ HỦY' && mine.trangThai !== status;
+  const isNotGoing = (status === 'KHÔNG ĐI');
+  const isDuBi = (status === 'DỰ BỊ');
   
   let reason = '';
   let phuongTien = 'TỰ TÚC';
   let diemDon = '';
 
-  // 1. NẾU CHỌN "ĐI" VÀ CHƯƠNG TRÌNH CÓ XE ĐƯA ĐÓN -> HỎI PHƯƠNG TIỆN & ĐIỂM ĐÓN
-  if (status === 'ĐI' && prog && (prog.phuongTien === 'ÁP DỤNG' || prog.phuongTien === 'XE CHUNG')) {
-    const listDiem = (prog.diemDon || 'Nhà thờ').split(',').map(s => s.trim()).filter(Boolean);
+  // 1. ÁP DỤNG CHO CẢ "ĐI" VÀ "DỰ BỊ" NẾU CHƯƠNG TRÌNH CÓ XE ĐƯA ĐÓN
+  const coXeDuaDon = (prog.phuongTien === 'ÁP DỤNG' || prog.phuongTien === 'XE CHUNG');
+  if ((status === 'ĐI' || status === 'DỰ BỊ') && coXeDuaDon) {
+    const rawDiem = prog.diemDon || 'Nhà thờ';
+    const listDiem = rawDiem.split(',').map(s => s.trim()).filter(Boolean);
     const textList = listDiem.map((d, idx) => `${idx + 1}. ${d}`).join('\n');
 
-    const chooseVehicle = confirm('Chương trình này có xe chung đưa đón.\n\n- Bấm OK: Đi XE CHUNG cùng ca đoàn\n- Bấm Cancel: TỰ TÚC xe riêng');
-    if (chooseVehicle) {
+    const chooseXe = confirm(`Chương trình "${prog.tenBuoi}" có xe đưa đón (áp dụng cho cả ĐI & DỰ BỊ):\n\n- Bấm OK: Đi XE CHUNG của ca đoàn\n- Bấm Cancel: TỰ TÚC xe riêng`);
+    
+    if (chooseXe) {
       phuongTien = 'XE CHUNG';
-      let pickMsg = `Chọn điểm đón xe bằng cách nhập số thứ tự tương ứng:\n\n${textList}\n\nNhập số thứ tự (1, 2, ...):`;
-      let choice = prompt(pickMsg, '1');
-      if (choice === null) return;
-      let idx = parseInt(choice, 10) - 1;
+      const promptText = `Chọn điểm đón xe tập trung:\n\n${textList}\n\nNhập số thứ tự điểm bạn muốn đón (1, 2, ...):`;
+      const pick = prompt(promptText, '1');
+      if (pick === null) return; // Bấm Cancel thì dừng thao tác
+      
+      const idx = parseInt(pick, 10) - 1;
       diemDon = listDiem[idx] || listDiem[0] || 'Tập trung tại Nhà thờ';
     } else {
       phuongTien = 'XE RIÊNG';
@@ -699,11 +709,16 @@ async function submitStatus(encodedMaBuoi, encodedStatus) {
     }
   }
 
-  // 2. NẾU KHÔNG ĐI, DỰ BỊ HOẶC THAY ĐỔI TRẠNG THÁI -> BẮT BUỘC NHẬP LÝ DO
-  if (isNotGoing || isChange) {
-    const promptMsg = isNotGoing 
-      ? `Bạn chọn "${status}". Vui lòng nhập lý do cụ thể gửi BĐH (bắt buộc):` 
-      : `Bạn đang gửi yêu cầu đổi sang "${status}". Trạng thái sẽ ở mức [CHỜ DUYỆT]. Vui lòng nhập lý do (bắt buộc):`;
+  // 2. BẮT BUỘC NHẬP LÝ DO NẾU LÀ "KHÔNG ĐI", "DỰ BỊ" HOẶC ĐỔI Ý (THAY ĐỔI TRẠNG THÁI)
+  if (isNotGoing || isDuBi || isChange) {
+    let promptMsg = '';
+    if (isNotGoing) {
+      promptMsg = 'Bạn chọn "KHÔNG ĐI". Vui lòng nhập lý do cụ thể gửi Ban Quản Trị (bắt buộc):';
+    } else if (isDuBi && !isChange) {
+      promptMsg = 'Bạn chọn "DỰ BỊ". Vui lòng nhập lý do cụ thể gửi Ban Quản Trị (bắt buộc):';
+    } else {
+      promptMsg = `Bạn đang gửi yêu cầu đổi sang "${status}". Yêu cầu này sẽ ở trạng thái [CHỜ DUYỆT]. Vui lòng nhập lý do (bắt buộc):`;
+    }
     
     const inputReason = prompt(promptMsg, '');
     if (inputReason === null) return;
