@@ -72,3 +72,44 @@ self.addEventListener('fetch', function (event) {
       })
   );
 });
+// Lắng nghe tín hiệu Push từ Cloudflare
+self.addEventListener('push', function(event) {
+  let data = { title: 'Thông báo SCYC', body: 'Bạn có thông báo mới từ ca đoàn!' };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch(e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: 'icons/icon-192.png',     // Icon thông báo
+    badge: 'icons/icon-192.png',    // Icon nhỏ trên thanh trạng thái
+    vibrate: [100, 50, 100],        // Rung máy
+    data: { url: data.url || '/member/' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Khi ca viên bấm vào thông báo trên thanh trạng thái -> Mở App
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (let i = 0; i < clientList.length; i++) {
+        let client = clientList[i];
+        if (client.url.includes('/member/') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(event.notification.data.url || '/member/');
+      }
+    })
+  );
+});
