@@ -413,10 +413,13 @@ const VAPID_PUBLIC_KEY = 'BASQVHD9qn5QtEhPqyDHSyAZkP7f6Agp-m5soluQyittR-zFg0VMkh
 
 // Kiểm tra quyền khi vào app
 function checkPushPermission() {
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
-    if (Notification.permission !== 'granted') {
-      document.getElementById('btnEnablePush').style.display = 'block';
-    }
+  const btn = document.getElementById('btnEnablePush');
+  if (!btn) return;
+  // Nếu máy không hỗ trợ Push HOẶC người dùng đã Cho Phép (granted) rồi thì ẩn nút
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || Notification.permission === 'granted') {
+    btn.style.display = 'none';
+  } else {
+    btn.style.display = 'flex';
   }
 }
 
@@ -487,7 +490,7 @@ function showLogin() {
 function showApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
-
+  checkPushPermission();
   document.getElementById('profileName').textContent = currentUser.hoTen;
   document.getElementById('profileBe').textContent = (currentUser.be || '').toUpperCase();
   document.getElementById('profileCode').textContent = currentUser.ma;
