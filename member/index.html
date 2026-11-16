@@ -14,7 +14,9 @@
   <meta name="apple-mobile-web-app-title" content="Ca Viên SCYC">
 
   <!-- Thư viện vẽ QR nội bộ -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
 
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -275,28 +277,59 @@
     </div>
 
     <div class="main-content">
-      <!-- TAB 1: THẺ QR CÁ NHÂN -->
+            <!-- TAB 1: THẺ QR CÁ NHÂN & QUÉT QR BUỔI -->
       <div id="tabQR" class="tab-pane active">
-      <button id="btnEnablePush" onclick="subscribeUserPush()" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:12px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">
-  <span>🔔</span> <span>Bật thông báo đẩy về điện thoại</span>
-</button>
+        <button id="btnEnablePush" onclick="subscribeUserPush()" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:12px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">
+          <span>🔔</span> <span>Bật thông báo đẩy về điện thoại</span>
+        </button>
 
         <!-- BẢNG TIN THÔNG BÁO NỘI BỘ -->
         <div id="bulletinWrap" style="display:none; margin-bottom:16px;"></div>
 
-        <div class="qr-card">
-          <div style="font-size: 14px; font-weight: 700; color: #65676b;">MÃ ĐIỂM DANH CÁ NHÂN</div>
-          <div class="qr-box" onclick="showBigQR()">
-            <div id="qrcodeHolder"></div>
-          </div>
-          <div class="qr-code-txt" id="displayCode">-</div>
-          <div class="qr-hint">Chạm vào mã QR để phóng to toàn màn hình</div>
+        <!-- THANH CHUYỂN CHẾ ĐỘ QR -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; background:#e4e6eb; padding:5px; border-radius:14px; margin-bottom:14px;">
+          <button id="btnModeMyQR" onclick="switchQRSubMode('MY_QR')" style="border:0; border-radius:10px; padding:10px; font-weight:700; font-size:13px; background:#fff; color:#1967d2; box-shadow:0 2px 6px rgba(0,0,0,0.08); cursor:pointer;">
+            💳 Mã QR của tôi
+          </button>
+          <button id="btnModeScanSession" onclick="switchQRSubMode('SCAN_SESSION')" style="border:0; border-radius:10px; padding:10px; font-weight:700; font-size:13px; background:transparent; color:#4b4f56; cursor:pointer;">
+            📷 Quét QR buổi
+          </button>
         </div>
 
-        <div style="margin-top: 16px; background:#fff; border-radius:16px; padding:16px; font-size:13px; color:#4b4f56; line-height:1.6;">
-          📌 <strong>Lưu ý:</strong> Bạn có thể mở thẻ QR này ngay cả khi <strong>không có kết nối mạng (Offline)</strong>. Hãy lưu trang này vào Màn hình chính của điện thoại để mở quét điểm danh nhanh nhất!
+        <!-- CHẾ ĐỘ 1: MÃ QR CÁ NHÂN -->
+        <div id="subMyQR">
+          <div class="qr-card">
+            <div style="font-size: 14px; font-weight: 700; color: #65676b;">MÃ ĐIỂM DANH CÁ NHÂN</div>
+            <div class="qr-box" onclick="showBigQR()">
+              <div id="qrcodeHolder"></div>
+            </div>
+            <div class="qr-code-txt" id="displayCode">-</div>
+            <div class="qr-hint">Chạm vào mã QR để phóng to toàn màn hình</div>
+          </div>
+
+          <div style="margin-top: 16px; background:#fff; border-radius:16px; padding:16px; font-size:13px; color:#4b4f56; line-height:1.6;">
+            📌 <strong>Lưu ý:</strong> Bạn có thể mở thẻ QR này ngay cả khi <strong>không có kết nối mạng (Offline)</strong>. Hãy lưu trang này vào Màn hình chính của điện thoại để mở quét điểm danh nhanh nhất!
+          </div>
+        </div>
+
+        <!-- CHẾ ĐỘ 2: CAMERA QUÉT MÃ QR BUỔI -->
+        <div id="subScanSession" style="display:none;">
+          <div class="qr-card" style="padding:18px 14px;">
+            <div style="font-size:15px; font-weight:800; color:#1967d2; margin-bottom:4px;">ĐIỂM DANH TỰ ĐỘNG</div>
+            <div style="font-size:12px; color:#65676b; margin-bottom:12px;">Đưa camera hướng vào mã QR của buổi do Ban Điều Hành cung cấp</div>
+            
+            <div id="memberSessionReader" style="width:100%; border-radius:14px; overflow:hidden; background:#111; min-height:260px;"></div>
+            
+            <div id="sessionScanResult" style="margin-top:12px;"></div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <button id="btnStartMemberCam" onclick="startMemberSessionScanner()" style="flex:1; height:42px; background:#1967d2; color:#fff; border:0; border-radius:10px; font-weight:700; cursor:pointer;">📷 Bật Camera</button>
+              <button id="btnStopMemberCam" onclick="stopMemberSessionScanner()" style="flex:1; height:42px; background:#e4e6eb; color:#1c1e21; border:0; border-radius:10px; font-weight:700; cursor:pointer;" disabled>■ Tắt Camera</button>
+            </div>
+          </div>
         </div>
       </div>
+
 
       <!-- TAB 2: ĐĂNG KÝ SỰ KIỆN -->
       <div id="tabEvents" class="tab-pane">
@@ -996,6 +1029,127 @@ function renderLogisticsList() {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 }
+
+/* ==================== TỰ QUÉT QR BUỔI ĐỂ ĐIỂM DANH ==================== */
+let memberQrScanner = null;
+let isMemberScanning = false;
+let isProcessingSessionScan = false;
+
+function switchQRSubMode(mode) {
+  const btnMy = document.getElementById('btnModeMyQR');
+  const btnScan = document.getElementById('btnModeScanSession');
+  const boxMy = document.getElementById('subMyQR');
+  const boxScan = document.getElementById('subScanSession');
+
+  if (mode === 'MY_QR') {
+    btnMy.style.background = '#fff';
+    btnMy.style.color = '#1967d2';
+    btnMy.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+    btnScan.style.background = 'transparent';
+    btnScan.style.color = '#4b4f56';
+    btnScan.style.boxShadow = 'none';
+    boxMy.style.display = 'block';
+    boxScan.style.display = 'none';
+    stopMemberSessionScanner();
+  } else {
+    btnScan.style.background = '#fff';
+    btnScan.style.color = '#1967d2';
+    btnScan.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+    btnMy.style.background = 'transparent';
+    btnMy.style.color = '#4b4f56';
+    btnMy.style.boxShadow = 'none';
+    boxMy.style.display = 'none';
+    boxScan.style.display = 'block';
+    startMemberSessionScanner();
+  }
+}
+
+async function startMemberSessionScanner() {
+  if (isMemberScanning) return;
+  const resBox = document.getElementById('sessionScanResult');
+  resBox.innerHTML = '';
+
+  try {
+    if (memberQrScanner) {
+      try { await memberQrScanner.clear(); } catch (e) {}
+    }
+    memberQrScanner = new Html5Qrcode('memberSessionReader');
+    await memberQrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      onMemberSessionScanSuccess,
+      () => {}
+    );
+    isMemberScanning = true;
+    document.getElementById('btnStartMemberCam').disabled = true;
+    document.getElementById('btnStopMemberCam').disabled = false;
+  } catch (err) {
+    resBox.innerHTML = `<div style="background:#fee2e2; color:#991b1b; padding:10px; border-radius:10px; font-size:13px;">Không thể mở camera. Hãy cấp quyền Camera cho trình duyệt và thử lại.</div>`;
+  }
+}
+
+async function stopMemberSessionScanner() {
+  if (!memberQrScanner || !isMemberScanning) return;
+  try {
+    await memberQrScanner.stop();
+  } catch (e) {}
+  isMemberScanning = false;
+  document.getElementById('btnStartMemberCam').disabled = false;
+  document.getElementById('btnStopMemberCam').disabled = true;
+}
+
+async function onMemberSessionScanSuccess(decodedText) {
+  if (isProcessingSessionScan) return;
+  const qrData = String(decodedText || '').trim();
+  if (!qrData) return;
+
+  isProcessingSessionScan = true;
+  const resBox = document.getElementById('sessionScanResult');
+  resBox.innerHTML = `<div style="background:#eff6ff; color:#1d4ed8; padding:12px; border-radius:10px; font-weight:700; font-size:13px;">⏳ Đang xác nhận điểm danh...</div>`;
+
+  try {
+    const res = await jsonp({
+      api: 'checkin_session_qr',
+      ma: currentUser.ma,
+      qrData: qrData
+    });
+
+    if (res.success) {
+      await stopMemberSessionScanner();
+      resBox.innerHTML = `
+        <div style="background:#dcfce7; color:#166534; padding:14px; border-radius:12px; border:1px solid #86efac;">
+          <div style="font-size:24px; margin-bottom:4px;">✅</div>
+          <div style="font-weight:800; font-size:15px;">ĐIỂM DANH THÀNH CÔNG</div>
+          <div style="font-size:13px; margin-top:4px;">Buổi: <b>${escapeHtml(res.tenBuoi)}</b></div>
+          <div style="font-size:12px; margin-top:2px;">Thời gian: ${escapeHtml(res.thoiGian)}</div>
+        </div>
+      `;
+    } else if (res.type === 'DUPLICATE') {
+      await stopMemberSessionScanner();
+      resBox.innerHTML = `
+        <div style="background:#fef3c7; color:#92400e; padding:14px; border-radius:12px; border:1px solid #fde68a;">
+          <div style="font-size:24px; margin-bottom:4px;">🟡</div>
+          <div style="font-weight:800; font-size:15px;">BẠN ĐÃ ĐIỂM DANH RỒI</div>
+          <div style="font-size:13px; margin-top:4px;">${escapeHtml(res.message)}</div>
+          ${res.thoiGianCu ? `<div style="font-size:12px; margin-top:2px;">Lúc: <b>${escapeHtml(res.thoiGianCu)}</b></div>` : ''}
+        </div>
+      `;
+    } else {
+      resBox.innerHTML = `
+        <div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:10px; font-size:13px;">
+          ❌ <b>Không thể điểm danh:</b> ${escapeHtml(res.message || 'Mã QR không hợp lệ.')}
+        </div>
+      `;
+      setTimeout(() => { isProcessingSessionScan = false; }, 2500);
+      return;
+    }
+  } catch (err) {
+    resBox.innerHTML = `<div style="background:#fee2e2; color:#991b1b; padding:10px; border-radius:10px; font-size:13px;">⚠️ Lỗi kết nối: ${escapeHtml(err.message)}</div>`;
+  }
+  isProcessingSessionScan = false;
+}
+
+
 </script>
 </body>
 </html>
