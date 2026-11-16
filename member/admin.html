@@ -149,6 +149,12 @@
       <div class="card">
         <label>📅 Chọn buổi làm việc</label>
         <select id="sessionSelect" onchange="changeAttendanceSession()"></select>
+
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button type="button" class="primary action-btn" onclick="showSessionQRModal()">📱 Hiện QR Buổi Cho Ca Viên Quét</button>
+        </div>
+
+
         <div id="tapHatNotice" style="margin-top:8px;"></div>
       </div>
 
@@ -836,6 +842,30 @@ async function deleteBulletin(id) {
     if (!res.success) return alert(res.message);
     loadAdminBulletins();
   } catch(e) { alert(e.message); }
+}
+
+function showSessionQRModal() {
+  if (!currentSession) return alert('Chưa chọn buổi.');
+  const sess = sessions.find(s => s.maBuoi === currentSession);
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  modal.onclick = () => modal.remove();
+  modal.innerHTML = `
+    <div style="background:#fff; padding:24px; border-radius:20px; text-align:center; max-width:340px; width:100%;" onclick="event.stopPropagation()">
+      <h3 style="margin:0 0 6px; color:#1967d2;">MÃ QR ĐIỂM DANH BUỔI</h3>
+      <div style="font-size:13px; color:#4b5563; margin-bottom:14px;">${escapeHtml(sess ? sess.tenBuoi + ' (' + sess.ngay + ')' : currentSession)}</div>
+      <div id="sessionQrPopupHolder" style="display:flex; justify-content:center; padding:12px; border:3px solid #1967d2; border-radius:14px; margin-bottom:12px;"></div>
+      <div style="font-family:monospace; font-weight:bold; color:#111827; margin-bottom:14px;">SESSION:${escapeHtml(currentSession)}</div>
+      <button class="secondary" onclick="this.closest('div').parentElement.remove()">Đóng</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  new QRCode(document.getElementById('sessionQrPopupHolder'), {
+    text: 'SESSION:' + currentSession,
+    width: 230,
+    height: 230,
+    correctLevel: QRCode.CorrectLevel.H
+  });
 }
 
   
